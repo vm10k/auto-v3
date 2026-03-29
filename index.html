@@ -1,0 +1,2565 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auto V3</title>
+    <!-- Ethers v6 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.13.2/ethers.umd.min.js"></script>
+    
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&family=Inter:wght@400;600;700&family=Merriweather:wght@700;900&display=swap');
+        
+:root { 
+            --bg-body: #FFFFFF; 
+            --text-main: #000000; 
+            --text-dim: #555555; /* For labels like LOW/HIGH */
+            --card-bg: #FFFFFF;
+            --border-color: #000000;
+            --border: 2px solid var(--border-color); 
+            --secondary-bg: #fafafa;
+            --dashed-line: #000000;
+            --status-ok-bg: #ffffff;
+            --status-bad-bg: #000000;
+        }
+
+        body.dark-mode {
+            --bg-body: #0a0a0a; 
+            --text-main: #ffffff; 
+            --text-dim: #aaaaaa; /* Lighter grey for dark mode labels */
+            --card-bg: #141414;
+            --border-color: #333333;
+            --secondary-bg: #1a1a1a;
+            --dashed-line: #444444;
+            --status-ok-bg: #141414;
+            --status-bad-bg: #ffffff;
+        }
+
+        body { background-color: var(--bg-body); color: var(--text-main); transition: 0.2s; }
+        
+        /* Fixed Badge and Inputs */
+        .chain-badge, .tab-btn, .info-card, .action-btn, .trade-box, .token-info, 
+        .slip-input, .small-btn, .toggle-btn, .pool-card, .mini-box, .modal-box, .search-input { 
+            border-color: var(--border-color) !important; 
+            background-color: var(--card-bg) !important;
+            color: var(--text-main) !important;
+        }
+
+        /* Fixed Labels */
+        .mini-label { color: var(--text-dim) !important; }
+        
+        .action-btn:hover, .small-btn:hover, .connect-btn:hover, .tab-btn.active, .toggle-btn.active {
+            background-color: var(--text-main) !important;
+            color: var(--bg-body) !important;
+        }
+        .dashed-line { border-top: 2px dashed var(--dashed-line); }
+        .loader-text, .token-info { background-color: var(--secondary-bg) !important; }
+        .pool-card.out-of-bounds { background-color: var(--secondary-bg) !important; border-style: dashed; }
+        .status-badge { border: 2px solid var(--border-color); }
+        .status-ok { background: var(--status-ok-bg); color: var(--text-main); }
+        .status-bad { background: var(--status-bad-bg); color: var(--bg-body); }
+        .modal-overlay { background: rgba(0,0,0,0.8); }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: 'Inter', sans-serif; background-color: var(--bg-body); color: var(--text-main); min-height: 100vh; display: flex; flex-direction: column; }
+        
+        /* Header */
+        .header-row { display: flex; justify-content: space-between; align-items: center; padding: 20px 40px; border-bottom: 2px solid #000; }
+        .logo-container { display: flex; align-items: center; gap: 15px; }
+        .logo-text { font-family: 'Merriweather', serif; font-weight: 900; font-size: 24px; letter-spacing: 1px; text-transform: uppercase; }
+        .header-right { display: flex; align-items: center; gap: 10px; }
+        .chain-badge { display: flex; align-items: center; gap: 8px; background: #fff; border: 2px solid #000; padding: 8px 16px; font-family: 'Courier Prime', monospace; font-weight: 700; }
+        .connect-btn { background: #fff; color: #000; padding: 10px 24px; border: 2px solid #000; font-family: 'Courier Prime', monospace; font-weight: 700; cursor: pointer; transition: 0.2s; height: 100%; display: flex; align-items: center;}
+        .connect-btn:hover { background: #000; color: #fff; }
+        
+        /* Tabs */
+        .tab-container { display: flex; justify-content: center; gap: 0; margin-top: 30px; border-bottom: 2px solid #000; width: fit-content; margin: 30px auto 20px auto; }
+        .tab-btn { background: #fff; border: 2px solid #000; border-bottom: none; padding: 12px 40px; font-family: 'Courier Prime', monospace; font-weight: 700; cursor: pointer; text-transform: uppercase; font-size: 14px; margin: 0 5px; position: relative; top: 2px; }
+        .tab-btn.active { background: #000; color: #fff; }
+        
+        /* Main Layout */
+        .main-container { width: 100%; max-width: 1000px; margin: 0 auto; padding: 20px; }
+        .view-section { display: none; }
+        .view-section.active { display: block; }
+        
+        /* Shared Elements */
+        .swap-title { font-family: 'Merriweather', serif; font-weight: 900; font-size: 20px; text-transform: uppercase; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
+        .info-card { border: 2px solid #000; background: #fff; padding: 30px; margin-bottom: 20px; box-shadow: 8px 8px 0px #000; }
+        .action-btn { width: 100%; background: #fff; color: #000; border: 2px solid #000; padding: 16px; font-family: 'Merriweather', serif; font-weight: 900; font-size: 16px; text-transform: uppercase; cursor: pointer; transition: 0.2s; margin-top: 20px; box-shadow: 4px 4px 0px #000; }
+        .action-btn:hover:not(:disabled) { background: #000; color: #fff; box-shadow: 2px 2px 0px #000; transform: translate(2px, 2px); }
+        .action-btn:disabled { background: #eee; color: #888; cursor: not-allowed; box-shadow: none; border-color: #ccc; transform: none; }
+        .dashed-line { border-top: 2px dashed #000; margin: 25px 0; }
+        .loader-text { font-family: 'Courier Prime', monospace; font-size: 12px; text-align: center; margin-top: 10px; font-weight: bold; padding: 10px; border: 1px solid #000; background: #fafafa; }
+        
+        /* Swap specific */
+        .trade-box { background: #fff; border: 2px solid #000; padding: 20px; display: flex; flex-direction: column; justify-content: space-between; height: 130px; position: relative; margin-bottom: 15px; }
+        .trade-header-small { display:flex; justify-content:space-between; font-family: 'Courier Prime', monospace; font-size: 12px; margin-bottom: 10px; font-weight: bold; text-transform: uppercase; }
+        .trade-content { display: flex; justify-content: space-between; align-items: center; height: 100%; }
+        .token-info { display: flex; align-items: center; gap: 10px; cursor: pointer; border: 1px solid #000; padding: 8px 12px; background: #fafafa; }
+        .token-info:hover { background: #eee; }
+        .token-symbol { font-family: 'Merriweather', serif; font-weight: 900; font-size: 18px; }
+        .input-group { text-align: right; width: 50%; }
+        .input-amount { width: 100%; border: none; background: transparent; font-family: 'Merriweather', serif; font-size: 28px; font-weight: 900; text-align: right; outline: none; padding: 0; }
+        .swap-arrow { text-align: center; margin: 10px 0; cursor: pointer; font-size: 24px; }
+        
+        /* Rebalance specific */
+        .rebalance-controls { display: flex; gap: 15px; margin-bottom: 20px; align-items: flex-end; }
+        .control-group { display: flex; flex-direction: column; flex: 1; }
+        .settings-label { font-family: 'Courier Prime', monospace; font-weight: 700; font-size: 12px; margin-bottom: 8px; text-transform: uppercase; }
+        .slip-input { border: 2px solid #000; padding: 12px; font-family: 'Courier Prime', monospace; outline: none; font-size: 14px; width: 100%; }
+        .slip-input:focus { background: #fafafa; }
+        .small-btn { padding: 10px 15px; font-family: 'Courier Prime', monospace; font-size: 12px; font-weight: bold; border: 2px solid #000; background: #fff; cursor: pointer; text-transform: uppercase; }
+        .small-btn:hover { background: #000; color: #fff; }
+        
+        /* Toggles */
+        .toggle-row { display: flex; justify-content: space-between; gap: 15px; margin-bottom: 20px; }
+        .toggle-btn { flex: 1; text-align: center; padding: 15px; font-family: 'Courier Prime', monospace; font-weight: bold; border: 2px solid #000; cursor: pointer; background: #fff; text-transform: uppercase; transition: 0.2s; }
+        .toggle-btn.active { background: #000; color: #fff; }
+        
+        /* Pool Cards */
+        .pool-list { display: grid; grid-template-columns: 1fr; gap: 20px; margin-top: 20px; }
+        .pool-card { border: 2px solid #000; padding: 20px; background: #fff; transition: 0.2s; }
+        .pool-card.out-of-bounds { background: #eee; border-style: dashed; }
+        .pool-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
+        .pool-pair { font-family: 'Merriweather', serif; font-weight: 900; font-size: 20px; }
+        .pool-actions { display: flex; gap: 10px; align-items: center; }
+        
+        .status-badge { display: inline-block; padding: 6px 12px; font-size: 12px; font-family: 'Courier Prime', monospace; font-weight: bold; border: 2px solid #000; text-transform: uppercase; }
+        .status-ok { background: #fff; color: #000; }
+        .status-bad { background: #000; color: #fff; }
+        
+        .mini-grid { display: flex; gap: 15px; }
+        .mini-box { border: 2px solid #000; padding: 15px; flex: 1; background: #fff; }
+        .mini-label { font-family: 'Courier Prime', monospace; font-size: 12px; text-transform: uppercase; margin-bottom: 8px; font-weight: bold; color: #555;}
+        .mini-val { font-family: 'Merriweather', serif; font-weight: 900; font-size: 18px; word-break: break-all;}
+        
+        /* Modal */
+        .modal-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); z-index: 1000; display: none; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; }
+        .modal-box { background: #fff; border: 4px solid #000; width: 400px; height: 500px; display: flex; flex-direction: column; box-shadow: 12px 12px 0px #000; }
+        .modal-header { padding: 20px; border-bottom: 2px solid #000; display: flex; justify-content: space-between; align-items: center; background: #000; color: #fff; }
+        .modal-title { font-family: 'Merriweather', serif; font-weight: 900; }
+        .close-btn { cursor: pointer; font-family: 'Courier Prime', monospace; font-weight: bold; font-size: 20px; color: #fff; }
+        .modal-search { padding: 15px; border-bottom: 2px solid #000; background: #fafafa; }
+        .search-input { width: 100%; padding: 12px; border: 2px solid #000; font-family: 'Courier Prime', monospace; outline: none; }
+        .token-list { overflow-y: auto; flex: 1; background: #fff; }
+        .modal-token-row { display: flex; align-items: center; gap: 15px; padding: 15px 20px; border-bottom: 1px solid #ccc; cursor: pointer; }
+        .modal-token-row:hover { background: #000; color: #fff; }
+		/* Fix the Modal for Night Mode */
+.modal-box { 
+    background-color: var(--card-bg) !important; 
+    border: 4px solid var(--border-color) !important; 
+}
+.modal-token-row { 
+    background-color: var(--card-bg); 
+    color: var(--text-main); 
+    border-bottom: 1px solid var(--border-color); 
+}
+.modal-token-row:hover { 
+    background-color: var(--text-main); 
+    color: var(--bg-body); 
+}
+.search-input {
+    background-color: var(--secondary-bg) !important;
+    border: 2px solid var(--border-color) !important;
+    color: var(--text-main) !important;
+}
+/* Ensure icons have a slight border so they stand out in dark mode */
+.modal-token-row img { border: 1px solid var(--border-color); }
+/* =========================================
+   NIGHT MODE FIXES FOR SWAP & MODAL UI
+   ========================================= */
+
+/* 1. Fix the blinding white overlay behind the modal in Dark Mode */
+body.dark-mode .modal-overlay {
+    background: rgba(0, 0, 0, 0.85);
+}
+
+/* 2. Fix the white empty space at the bottom of the Token List */
+body.dark-mode .token-list {
+    background-color: var(--card-bg);
+}
+
+/* 3. Fix the Search Box area background and borders */
+body.dark-mode .modal-search {
+    background-color: var(--card-bg);
+    border-bottom: 2px solid var(--border-color);
+}
+body.dark-mode .modal-header {
+    border-bottom: 2px solid var(--border-color);
+}
+
+/* 4. Fix the Swap Input numbers (Make them white in dark mode, black in light) */
+.input-amount {
+    color: var(--text-main);
+}
+
+/* 5. Fix Swap "You Pay" / "Balance" text and the Swap Arrow color */
+body.dark-mode .trade-header-small {
+    color: var(--text-dim);
+}
+body.dark-mode .swap-arrow {
+    color: var(--text-main);
+}
+
+/* 6. Ensure token dropdown symbols are clearly visible */
+body.dark-mode .token-symbol,
+body.dark-mode .token-info span {
+    color: var(--text-main);
+}
+/* =========================================
+   NIGHT MODE FIXES FOR APR & GRAPH
+   ========================================= */
+
+/* 1. Fix the hardcoded black APR text & Pending Rewards text */
+body.dark-mode .mini-val span[style*="color:#000;"],
+body.dark-mode .mini-val[style*="color:#000;"] {
+    color: var(--text-main) !important;
+}
+
+/* 2. Fix the dark grey (#555) Pending Fees text (EURC/USDC balances) */
+body.dark-mode .mini-val[style*="color:#555;"] {
+    color: var(--text-dim) !important;
+}
+
+/* 3. Fix the black "Live Price" line in the visualizer graph */
+body.dark-mode div[style*="width:2px;"][style*="background:#000;"] {
+    background: var(--text-main) !important;
+    box-shadow: 0 0 3px rgba(0, 0, 0, 0.9) !important; /* Makes it pop in dark mode */
+}
+
+/* 4. Fix the "Live Price" label text under the graph */
+body.dark-mode span[style*="color:black;"] {
+    color: var(--text-main) !important;
+}
+
+/* 5. Fix the hardcoded black vertical divider line next to Pending Fees/Rewards */
+body.dark-mode div[style*="border-left:2px solid #000;"] {
+    border-left-color: var(--border-color) !important;
+}
+/* =========================================
+   NIGHT MODE FIXES FOR DIVIDER LINES
+   ========================================= */
+
+/* Fix the black line under "Add Slipstream Pool", "Direct Swap", and "History" */
+body.dark-mode .swap-title {
+    border-bottom: 2px solid var(--border-color) !important;
+}
+
+/* Fix the black line under the Pool Name (e.g. EURC / USDC) */
+body.dark-mode .pool-header {
+    border-bottom: 2px solid var(--border-color) !important;
+}
+
+/* Optional: Fix the main header and tab container lines so they match */
+body.dark-mode .header-row,
+body.dark-mode .tab-container {
+    border-bottom: 2px solid var(--border-color) !important;
+}
+/* =========================================
+   NIGHT MODE FIXES FOR STATUS BADGES
+   ========================================= */
+
+/* 1. Fix the pure black border on the default "LOADING..." badge */
+body.dark-mode .status-badge {
+    border-color: var(--border-color) !important;
+    color: var(--text-main) !important;
+}
+
+/* 2. Fix the hardcoded light grey "NO ACTIVE NFT" badge */
+body.dark-mode .status-badge[style*="background:#eee;"] {
+    background: var(--secondary-bg) !important;
+    color: var(--text-dim) !important;
+    border-color: var(--border-color) !important;
+}
+/* =========================================
+   NIGHT MODE FIX FOR "IN RANGE" BADGE
+   ========================================= */
+
+/* Force the text inside the white 'IN RANGE' box to be black */
+body.dark-mode .status-ok {
+    background-color: #ffffff !important;
+    color: #000000 !important; 
+}
+
+/* Ensure the 'OUT OF BOUNDS' badge flips to white with black text to stand out */
+body.dark-mode .status-bad {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+}
+/* =========================================
+   GAS JAR TOGGLE SWITCH STYLING
+   ========================================= */
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 50px;
+  height: 26px;
+}
+.switch input { opacity: 0; width: 0; height: 0; }
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #ccc;
+  transition: .4s;
+  border: 2px solid var(--border-color);
+}
+.slider:before {
+  position: absolute;
+  content: "";
+  height: 16px; width: 16px;
+  left: 3px; bottom: 3px;
+  background-color: var(--border-color);
+  transition: .4s;
+}
+input:checked + .slider { background-color: #00b800; }
+input:checked + .slider:before {
+  transform: translateX(24px);
+  background-color: #fff;
+}
+.logo-subtext {
+    font-family: 'Courier Prime', monospace;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: -5px; /* Pulls it closer to the main title */
+    display: block;
+    color: var(--text-main);
+}
+    </style>
+</head>
+<body>
+    <div class="header-row">
+      <div class="logo-container" style="flex-direction: row; align-items: center; gap: 15px;">
+    <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 0;">
+        <span class="logo-text">Auto V3</span>
+        <span class="logo-subtext">by vm10k</span>
+    </div>
+    
+    <div style="display: flex; align-items: center; gap: 10px; margin-left: 5px;">
+        <span style="font-family: 'Courier Prime', monospace; font-size: 12px; font-weight: bold; color: var(--text-dim); text-transform: uppercase;">for</span>
+        <div style="background: #ffffff; padding: 4px 10px; border: 2px solid #000; box-shadow: 2px 2px 0px #000; display: flex; align-items: center;">
+            <img src="https://aerodrome.finance/brand-kit/AERO/logo-dark.png" alt="Aerodrome" style="height: 18px; width: auto; display: block;">
+        </div>
+    </div>
+</div>
+       <div class="header-right">
+	   <button id="btnGasJar" class="connect-btn" onclick="toggleGasJar()" style="margin-right: 5px; padding: 10px 15px;" title="Gas Reserves">GAS JAR: OFF</button>
+    <button class="connect-btn" onclick="openPKModal()" style="margin-right: 5px; background: #ff3333; color: #fff; border-color: #ff3333;">BOT MODE</button>
+            <button class="connect-btn" onclick="toggleNightMode()" style="margin-right: 5px;">THEME</button>
+            <div class="chain-badge">
+                <span>CHAIN: BASE</span>
+            </div>
+    <button id="connectWallet" class="connect-btn" onclick="connectWallet()">CONNECT WALLET</button>
+	            </div>
+
+    </div>
+    
+    <div class="tab-container">
+        <button class="tab-btn" onclick="switchTab('swap')">SWAP</button>
+        <button class="tab-btn active" onclick="switchTab('rebalance')">V3 REBALANCER</button>
+        <button class="tab-btn" onclick="switchTab('history')">HISTORY & P/NL</button>
+		    <button class="tab-btn" onclick="switchTab('info')">INFO</button>
+
+    </div>
+
+    <div class="main-container">
+        
+        <div id="swap-view" class="view-section">
+            <div class="info-card" style="max-width: 600px; margin: 0 auto;">
+                <div class="swap-title">Direct Swap</div>
+                
+               <div class="trade-box">
+                    <div class="trade-header-small"><span>You Pay</span><span id="sellBalance">Balance: 0.00</span></div>
+                    <div class="trade-content">
+                        <div class="token-info" onclick="openModal('sell')">
+<img src="" id="sIcon" style="width: 28px; height: 28px; border-radius: 50%; border: 1px solid #000;" onerror="this.src='https://placehold.co/28x28/black/white?text=?'">
+                            <div class="token-symbol" id="sSym">AERO</div>
+                            <span style="font-size:10px;">▼</span>
+                        </div>
+                        <div class="input-group"><input type="number" id="inpAmt" class="input-amount" placeholder="0" oninput="debounceSwapQuote()"></div>
+                    </div>
+                </div>
+                
+                <div class="swap-arrow" onclick="flipSwapTokens()">⇅</div>
+                
+                <div class="trade-box">
+                    <div class="trade-header-small"><span>You Receive</span><span id="buyBalance">Balance: 0.00</span></div>
+                    <div class="trade-content">
+                        <div class="token-info" onclick="openModal('buy')">
+<img src="" id="bIcon" style="width: 28px; height: 28px; border-radius: 50%; border: 1px solid #000;" onerror="this.src='https://placehold.co/28x28/black/white?text=?'">
+                            <div class="token-symbol" id="bSym">USDC</div>
+                            <span style="font-size:10px;">▼</span>
+                        </div>
+                        <div class="input-group"><input type="text" id="outAmt" class="input-amount" placeholder="0" readonly></div>
+                    </div>
+                </div>
+                <div id="swapRouteLog" class="loader-text" style="display:none; margin-top:20px;"></div>
+                <button id="btnDirectSwap" class="action-btn" onclick="executeDirectSwap()" disabled>ENTER AMOUNT</button>
+            </div>
+        </div>
+
+        <div id="rebalance-view" class="view-section active">
+            
+            <div class="toggle-row">
+                <div id="btnToggleMonitor" class="toggle-btn" onclick="toggleMonitor()">MONITOR: OFF</div>
+                <div id="btnToggleAuto" class="toggle-btn" onclick="toggleAutoRebalance()">AUTO-REBALANCE: OFF</div>
+				                <div id="btnToggleCompound" class="toggle-btn" onclick="toggleAutoCompound()">AUTO-COMPOUND: OFF</div>
+
+            </div>
+            
+           <div class="info-card">
+    <div class="swap-title" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>Add Slipstream Pool</span>
+        <div style="display:flex; gap:5px;">
+            <button id="modePct" class="small-btn active" onclick="setRangeMode('pct')" style="font-size:10px; padding:4px 8px;">MODE: %</button>
+            <button id="modePrice" class="small-btn" onclick="setRangeMode('price')" style="font-size:10px; padding:4px 8px;">MODE: PRICE</button>
+        </div>
+    </div>
+    <div class="rebalance-controls" style="flex-wrap: wrap; gap: 15px 10px;">
+        <div class="control-group" style="flex: 1 1 200px;">
+            <span class="settings-label">Pool Address</span>
+            <input type="text" id="newPoolAddr" class="slip-input" placeholder="0x...">
+        </div>
+        <div class="control-group" style="flex: 1 1 80px;">
+            <span id="labelLower" class="settings-label">Lower (- %)</span>
+            <input type="number" id="newPoolLower" class="slip-input" value="10">
+        </div>
+        <div class="control-group" style="flex: 1 1 80px;">
+            <span id="labelUpper" class="settings-label">Upper (+ %)</span>
+            <input type="number" id="newPoolUpper" class="slip-input" value="10">
+        </div>
+        <div class="control-group" style="flex: 1 1 60px;">
+            <span class="settings-label">Buffer %</span>
+            <input type="number" id="newPoolBuffer" class="slip-input" value="1">
+        </div>
+        <div class="control-group" style="flex: 1 1 80px;">
+            <span class="settings-label">Size ($)</span>
+            <input type="number" id="newPoolSize" class="slip-input" placeholder="MAX">
+        </div>
+        <div class="control-group" style="flex: 1 1 80px;">
+            <span class="settings-label">Min Cmpd</span>
+            <input type="number" id="newPoolCmpd" class="slip-input" value="5" title="AERO required to Auto-Compound">
+        </div>
+        <div class="control-group" style="flex: 1 1 80px;">
+            <span class="settings-label">Shift %</span>
+            <input type="number" id="newPoolShift" class="slip-input" placeholder="Opt" title="Rebalance if price shifts X% from center">
+        </div>
+        <button onclick="addPool()" class="small-btn" style="padding: 12px 20px; height: 44px; flex-grow: 1;">+ ADD POOL</button>
+    </div>
+</div>
+            <div id="monitorLog" class="loader-text" style="display: none; border: 2px solid #000;">[ SYSTEM ] Auto-monitor running...</div>
+
+            <div id="poolListContainer" class="pool-list"></div>
+        </div>
+
+        <div id="history-view" class="view-section">
+            <div class="info-card" style="min-height: 400px;">
+                <div class="swap-title" style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>LOCAL ACTION HISTORY</span>
+                    <button class="small-btn" onclick="clearHistory()">CLEAR LOGS</button>
+                </div>
+                <div id="historyListContainer" style="display:flex; flex-direction:column;">
+                </div>
+            </div>
+        </div>
+		<div id="info-view" class="view-section">
+    <div class="info-card" style="max-width: 900px; margin: 0 auto; text-align: left;">
+        <div class="swap-title" style="text-align: center; font-size: 28px;">ABOUT AUTO-REBALANCER</div>
+        
+        <p style="font-family: 'Courier Prime', monospace; line-height: 1.6; margin-bottom: 20px;">
+            This Dapp is a 100% free, decentralized liquidity management tool specifically designed for Aerodrome Slipstream (V3) pools on the Base Network. Below is a detailed breakdown of all available features.
+        </p>
+
+        <div style="display: grid; grid-template-columns: 1fr; gap: 20px; margin-top: 30px;">
+            
+            <div style="border: 2px solid #000; padding: 20px; background: var(--secondary-bg);">
+                <h4 style="font-family: 'Merriweather', serif; margin-bottom: 10px; font-size: 18px;"> V3 AUTO-REBALANCING</h4>
+                <p style="font-size: 13px; font-family: 'Inter', sans-serif; line-height: 1.5;">When the market price exits your defined <b>Lower</b> or <b>Upper</b> bounds, the system automatically pulls your liquidity. It then calculates the optimal 50/50 ratio for the new price, executes any necessary asset swaps, and remints a fresh, perfectly centered concentrated liquidity position.</p>
+            </div>
+
+            <div style="border: 2px solid #000; padding: 20px; background: var(--secondary-bg);">
+                <h4 style="font-family: 'Merriweather', serif; margin-bottom: 10px; font-size: 18px;"> AUTO-COMPOUND</h4>
+                <p style="font-size: 13px; font-family: 'Inter', sans-serif; line-height: 1.5;">Instead of just accumulating AERO rewards passively, the bot monitors your <b>Pending Rewards</b>. Once they hit your configured <b>Min Cmpd</b> threshold (e.g., 5 AERO), the tool automatically claims the AERO, swaps it for your pool's underlying tokens, and adds it back to your principal position, massively boosting your APY through continuous compounding.</p>
+            </div>
+
+            <div style="border: 2px solid #000; padding: 20px; background: var(--secondary-bg);">
+                <h4 style="font-family: 'Merriweather', serif; margin-bottom: 10px; font-size: 18px;"> SHIFT % (DYNAMIC RECENTERING)</h4>
+                <p style="font-size: 13px; font-family: 'Inter', sans-serif; line-height: 1.5;">A proactive rebalancing trigger. If you set a <b>Shift %</b> of 5%, the bot will rebalance your position if the price moves 5% away from your exact center point—even if it hasn't fallen entirely out of your safe bounds yet. This keeps your capital maximally active near the live price.</p>
+            </div>
+
+            <div style="border: 2px solid #000; padding: 20px; background: var(--secondary-bg);">
+                <h4 style="font-family: 'Merriweather', serif; margin-bottom: 10px; font-size: 18px;"> GAS JAR SYSTEM</h4>
+                <p style="font-size: 13px; font-family: 'Inter', sans-serif; line-height: 1.5;">Automated smart contracts cost gas. When enabled, the Gas Jar automatically diverts 2% of your harvested compound rewards and swaps them into ETH. This creates a self-sustaining loop where the bot constantly replenishes its own gas tank, allowing it to run indefinitely unattended without you needing to top off the wallet.</p>
+            </div>
+
+            <div style="border: 2px solid #000; padding: 20px; background: var(--secondary-bg);">
+                <h4 style="font-family: 'Merriweather', serif; margin-bottom: 10px; font-size: 18px;"> BOT MODE</h4>
+                <p style="font-size: 13px; font-family: 'Inter', sans-serif; line-height: 1.5;">For true automation, you cannot manually click "Approve" on every transaction via MetaMask. By entering a <b>Burner Wallet Private Key</b>, the app signs transactions silently in the background. The key is held strictly in temporary RAM and disappears the moment you close or refresh the tab. <b>Always use a burner wallet with limited funds!</b></p>
+            </div>
+
+            <div style="border: 2px solid #000; padding: 20px; background: var(--secondary-bg);">
+                <h4 style="font-family: 'Merriweather', serif; margin-bottom: 10px; font-size: 18px;"> DIRECT SWAP & BACKGROUND MONITOR</h4>
+                <p style="font-size: 13px; font-family: 'Inter', sans-serif; line-height: 1.5;">The tool includes an integrated <b>Direct Swap</b> aggregator (via Odos API) for lightning-fast token trades with low slippage. The <b>Monitor Toggle</b> runs a continuous background loop every 30 seconds to fetch live pool data, updating the visualizer graph, pending fees, and instantly triggering automated actions exactly when needed.</p>
+            </div>
+
+        </div>
+
+        <div class="dashed-line"></div>
+
+        <div style="font-family: 'Courier Prime', monospace; font-weight: bold; margin-bottom: 20px;">
+            <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 10px;">
+                <span>DISCORD:</span>
+                <span style="border: 2px solid #000; padding: 2px 8px;">vm10k</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span>GITHUB:</span>
+                <span style="border: 2px solid #000; padding: 2px 8px;">@vm10k</span>
+            </div>
+        </div>
+
+        <div class="dashed-line"></div>
+
+        <div style="background: var(--card-bg); border: 2px solid #000; padding: 20px; position: relative;">
+            <small style="color: #00b800; font-weight: bold; font-family: 'Courier Prime';">SUPPORT THE PROJECT</small>
+            <p style="font-size: 12px; margin-top: 5px; font-family: 'Inter';">This is a free public good. If you find it useful, consider tipping to the author:</p>
+            <div style="margin-top: 15px; font-family: 'Courier Prime'; font-size: 13px; word-break: break-all; background: #eee; padding: 10px; border: 1px solid #000; color: #000;">
+                0x22f9790175ef4f549092c91123e0f7c339cc7d3d
+            </div>
+        </div>
+    </div>
+</div>
+
+       
+
+   
+</div>
+ <div style="margin: 40px 0; text-align: center; font-family: 'Courier Prime', monospace; font-size: 12px; text-transform: uppercase;">
+        Report any bugs at: 
+        <a href="https://discord.gg/SGgnvyjFn5" style="color: #000; font-weight: bold; text-decoration: underline; margin-left: 5px;">
+            <img src="https://cdn-icons-png.flaticon.com/512/5968/5968756.png" style="width:14px; vertical-align:middle; margin-right:5px;">DISCORD
+        </a>
+    </div>
+<div id="gasJarModal" class="modal-overlay">
+    
+    <div class="modal-box" style="height: auto; min-height: 380px;">
+        
+        <div class="modal-header">
+            <span class="modal-title">GAS JAR</span>
+            <span class="close-btn" onclick="closeGasJarModal()">X</span>
+        </div>
+
+        <div style="padding: 20px; font-family: 'Courier Prime', monospace; line-height: 1.5; display: flex; flex-direction: column; flex: 1;">
+            
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid var(--border-color);">
+                <div>
+                    <span style="font-family: 'Merriweather', serif; font-weight: 900; font-size: 16px;">JAR STATUS</span><br>
+                    <small id="gasJarStatusText" style="color: var(--text-dim);">Diverting 2% to ETH</small>
+                </div>
+                <label class="switch">
+                    <input type="checkbox" id="jarToggleCheckbox" onchange="syncJarFromModal(this.checked)">
+                    <span class="slider"></span>
+                </label>
+            </div>
+
+            <div>
+                <p style="font-size: 13px; color: var(--text-dim); margin-bottom: 15px;">When active, 2% of compound rewards are converted to ETH to cover gas.</p>
+                
+                <div style="padding: 15px; border: 2px dashed var(--border-color); background: var(--secondary-bg); text-align: center;">
+                    <strong style="font-size: 10px; color: var(--text-dim); letter-spacing: 1px;">AVAILABLE RESERVES</strong><br>
+                    <span id="gasReserveAmount" style="font-size: 22px; font-family: 'Merriweather', serif; font-weight: 900;">0.00000 ETH</span>
+                </div>
+            </div>
+            
+            <button class="action-btn" style="margin-top: 25px; padding: 12px;" onclick="closeGasJarModal()">CLOSE</button>
+        </div>
+    </div>
+</div>
+<div id="statusModal" class="modal-overlay">
+    <div class="modal-box" style="height: auto; min-height: 280px; width: 350px;">
+        <div id="statusHeader" class="modal-header" style="background: #00b800; color: #fff;">
+            <span id="statusTitle" class="modal-title">SUCCESS</span>
+            <span class="close-btn" onclick="closeStatusModal()">X</span>
+        </div>
+        <div style="padding: 25px; font-family: 'Courier Prime', monospace; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 15px;">
+<div id="statusIcon"></div>
+            <p id="statusText" style="font-size: 14px; font-weight: bold; line-height: 1.4; color: var(--text-main);"></p>
+            
+            <button class="action-btn" style="margin-top: 10px; padding: 12px; width: 100%;" onclick="closeStatusModal()">OK, UNDERSTOOD</button>
+        </div>
+    </div>
+</div>
+<div id="pkModal" class="modal-overlay">
+    <div class="modal-box" style="height: auto; min-height: 350px;">
+        <div class="modal-header" style="background: #ff3333; color: #fff;">
+            <span class="modal-title">⚠️ BOT MODE: PRIVATE KEY</span>
+            <span class="close-btn" onclick="closePKModal()">X</span>
+        </div>
+        <div style="padding: 20px; font-family: 'Courier Prime', monospace; display: flex; flex-direction: column; gap: 15px;">
+            <div style="background: #fff3f3; border: 2px dashed #ff3333; padding: 12px; font-size: 12px; color: #cc0000; font-weight: bold;">
+                WARNING: Entering a private key in a browser is risky. Use a BURNER WALLET with small amounts only.
+            </div>
+            
+            <p style="font-size: 13px; color: var(--text-main);">This key is held in <b>temporary RAM only</b> and is destroyed when you refresh or close the tab.</p>
+            
+            <div class="control-group">
+                <span class="settings-label">Enter Private Key</span>
+                <input type="password" id="pkInput" class="slip-input" placeholder="0x..." style="letter-spacing: 2px;">
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-top: 10px;">
+                <button class="action-btn" style="margin-top:0; flex: 1; background: #000; color: #fff;" onclick="handlePKConnect()">START BOT MODE</button>
+                <button class="action-btn" style="margin-top:0; flex: 1; background: var(--bg-body); color: var(--text-main);" onclick="closePKModal()">CANCEL</button>
+            </div>
+        </div>
+    </div>
+</div>
+    <div id="lowGasModal" class="modal-overlay" style="z-index: 2000;">
+        <div class="modal-box" style="height: auto; min-height: 280px; border-color: #ff3333;">
+            <div class="modal-header" style="background: #ff3333; color: white; border-bottom: 2px solid #ff3333;">
+                <span class="modal-title">⚠️ LOW GAS WARNING</span>
+            </div>
+            <div style="padding: 20px; font-family: 'Courier Prime', monospace; line-height: 1.5; display: flex; flex-direction: column; justify-content: space-between; flex: 1;">
+                <div>
+                    <p style="font-size: 14px; color: var(--text-main); font-weight: bold;">Your ETH balance is critically low!</p>
+                    <p style="font-size: 12px; color: var(--text-dim); margin-top: 10px;">Transactions may fail if you don't have enough to cover network gas fees.</p>
+                    
+                    <div style="margin-top: 15px; padding: 10px; border: 2px dashed #ff3333; background: var(--secondary-bg); text-align: center;">
+                        <strong style="font-size: 12px; color: var(--text-dim);">CURRENT BALANCE</strong><br>
+                        <span id="lowGasAmount" style="font-size: 20px; font-family: 'Merriweather', serif; font-weight: 900; color: #ff3333;">0.0000 ETH</span>
+                    </div>
+                </div>
+                <button class="action-btn" style="margin-top: 20px; padding: 12px; border-color: #ff3333; color: #ff3333;" onclick="closeLowGasModal()">I UNDERSTAND, PROCEED</button>
+            </div>
+        </div>
+    </div>
+    <div id="retryModal" class="modal-overlay" style="z-index: 3000;">
+        <div class="modal-box" style="height: auto; min-height: 250px; border-color: #ff9900;">
+            <div class="modal-header" style="background: #ff9900; color: #000; border-bottom: 2px solid #ff9900;">
+                <span class="modal-title">⚠️ ACTION PAUSED</span>
+            </div>
+            <div style="padding: 20px; font-family: 'Courier Prime', monospace; line-height: 1.5; display: flex; flex-direction: column; flex: 1; text-align:center;">
+                <p style="font-size: 14px; font-weight: bold;">An error occurred during <span id="failActionType" style="color:var(--text-dim);"></span>.</p>
+                <p style="font-size: 16px; font-family:'Merriweather', serif; font-weight:900; margin-top: 5px;">Pool: <span id="failPoolName"></span></p>
+                
+                <div style="margin-top: 15px; padding: 10px; border: 2px dashed #ff9900; background: var(--secondary-bg);">
+                    <p style="font-size: 11px; font-weight: bold; color: #ff3333;">The automation queue has been paused to protect your funds.</p>
+                </div>
+                
+                <div style="display:flex; gap:10px; margin-top:20px;">
+                    <button class="action-btn" style="margin-top:0; padding:12px; border-color:#000; background:var(--bg-body); color:var(--text-main);" onclick="skipQueueAction()">SKIP TO NEXT</button>
+                    <button class="action-btn" style="margin-top:0; padding:12px; border-color:#00b800; background:#00b800; color:#fff;" onclick="retryQueueAction()">RETRY SWAP</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div id="editStrategyModal" class="modal-overlay" style="z-index: 2500;">
+        <div class="modal-box" style="height: auto; min-height: 480px;">
+            <div class="modal-header">
+                <span class="modal-title">⚙️ EDIT STRATEGY</span>
+                <span class="close-btn" onclick="closeEditModal()">X</span>
+            </div>
+            <div style="padding: 20px; font-family: 'Courier Prime', monospace; display: flex; flex-direction: column; gap: 15px; overflow-y: auto;">
+                <input type="hidden" id="editPoolIndex">
+                
+                <div class="control-group">
+                    <span class="settings-label">Lower (- %)</span>
+                    <input type="number" id="editLow" class="slip-input">
+                </div>
+                <div class="control-group">
+                    <span class="settings-label">Upper (+ %)</span>
+                    <input type="number" id="editHigh" class="slip-input">
+                </div>
+                <div class="control-group">
+                    <span class="settings-label">Edge Buffer %</span>
+                    <input type="number" id="editBuffer" class="slip-input">
+                </div>
+                <div class="control-group">
+                    <span class="settings-label" title="Rebalance if price shifts X% from center">Center Shift Trigger % (0=Off)</span>
+                    <input type="number" id="editShift" class="slip-input">
+                </div>
+                <div class="control-group">
+                    <span class="settings-label">Max Size ($) (0=MAX)</span>
+                    <input type="number" id="editSize" class="slip-input">
+                </div>
+                
+                <button class="action-btn" style="margin-top: 10px; padding: 12px;" onclick="saveEditedStrategy()">SAVE NEW STRATEGY</button>
+            </div>
+        </div>
+    </div>
+    <div id="tokenModal" class="modal-overlay">
+        <div class="modal-box">
+            <div class="modal-header">
+                <span class="modal-title">SELECT TOKEN</span>
+                <span class="close-btn" onclick="closeModal()">X</span>
+            </div>
+            <div class="modal-search">
+                <input type="text" class="search-input" placeholder="Search Symbol..." oninput="searchTokens(this.value)">
+            </div>
+            <div id="modalList" class="token-list"></div>
+        </div>
+    </div>
+
+    <script>
+        const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
+        const BASE_CHAIN_ID = 8453; 
+        const BASE_CHAIN_HEX = "0x2105";
+        const NFPM_ADDRESS = "0x827922686190790b37229fd06084350E74485b72";
+const AERO_ADDR = "0x940181a94A35A4569E4529A3CDfB74e38FD98631";
+const USDC_ADDR = "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913";
+
+let priceCache = {};
+let lastPriceFetch = 0;
+
+async function getCachedPriceUSD(tokenAddr, decimals) {
+    if(tokenAddr.toLowerCase() === USDC_ADDR.toLowerCase()) return 1.0;
+    const now = Date.now();
+    if (priceCache[tokenAddr] && now - lastPriceFetch < 60000) return priceCache[tokenAddr];
+    
+    try {
+        const oneUnit = ethers.parseUnits("1", Number(decimals)).toString();
+        const res = await fetch("https://api.odos.xyz/sor/quote/v2", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chainId: BASE_CHAIN_ID, inputTokens:[{ tokenAddress: tokenAddr, amount: oneUnit }], outputTokens:[{ tokenAddress: USDC_ADDR, proportion: 1 }], userAddr: "0x0000000000000000000000000000000000000001", slippageLimitPercent: 1.0, compact: true })
+        });
+        const data = await res.json();
+        const price = parseFloat(ethers.formatUnits(data.outAmounts[0], 6));
+        priceCache[tokenAddr] = price;
+        lastPriceFetch = now;
+        return price;
+    } catch(e) { return priceCache[tokenAddr] || 0; }
+}
+        const ERC20_ABI =[
+            "function decimals() view returns (uint8)",
+            "function balanceOf(address owner) view returns (uint256)",
+            "function approve(address spender, uint256 amount) public returns (bool)",
+            "function allowance(address owner, address spender) view returns (uint256)",
+            "function symbol() view returns (string)"
+        ];
+const GAUGE_ABI =[
+            "function deposit(uint256 tokenId) external",
+            "function withdraw(uint256 tokenId) external",
+            "function stakedValues(address depositor) external view returns (uint256[])",
+            "function earned(address account, uint256 tokenId) external view returns (uint256)", 
+            "function rewardRate() external view returns (uint256)",
+            "function getReward(uint256 tokenId) external" 
+        ];
+       const POOL_ABI =[
+    "function slot0() external view returns (uint160 sqrtPriceX96, int24 tick, uint16 observationIndex, uint16 observationCardinality, uint16 observationCardinalityNext, bool unlocked)",
+    "function tickSpacing() external view returns (int24)",
+    "function token0() external view returns (address)",
+    "function token1() external view returns (address)",
+    "function gauge() external view returns (address)",
+    "function liquidity() external view returns (uint128)" 
+];
+
+       const NFPM_ABI =[
+    "function positions(uint256 tokenId) external view returns (uint96 nonce, address operator, address token0, address token1, int24 tickSpacing, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 feeGrowthInside0LastX128, uint256 feeGrowthInside1LastX128, uint128 tokensOwed0, uint128 tokensOwed1)",
+    "function decreaseLiquidity(tuple(uint256 tokenId, uint128 liquidity, uint256 amount0Min, uint256 amount1Min, uint256 deadline) params) external payable returns (uint256 amount0, uint256 amount1)",
+    "function collect(tuple(uint256 tokenId, address recipient, uint128 amount0Max, uint128 amount1Max) params) external payable returns (uint256 amount0, uint256 amount1)",
+    "function mint(tuple(address token0, address token1, int24 tickSpacing, int24 tickLower, int24 tickUpper, uint256 amount0Desired, uint256 amount1Desired, uint256 amount0Min, uint256 amount1Min, address recipient, uint256 deadline, uint160 sqrtPriceX96) params) external payable returns (uint256 tokenId, uint128 liquidity, uint256 amount0, uint256 amount1)",
+    "function balanceOf(address owner) external view returns (uint256)",
+    "function tokenOfOwnerByIndex(address owner, uint256 index) external view returns (uint256)",
+    "function approve(address to, uint256 tokenId) external", 
+    "event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)" 
+];
+
+        const DEFAULT_TOKENS =[
+{ symbol: "USDC", address: "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913", decimals: 6, logo: "https://tokens.1inch.io/0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48.png" },
+            { symbol: "AERO", address: "0x940181a94A35A4569E4529A3CDfB74e38FD98631", decimals: 18 },
+ { symbol: "WETH", address: "0x4200000000000000000000000000000000000006", decimals: 18, logo: "https://tokens.1inch.io/0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2.png" },
+ { symbol: "ETH", address: ZERO_ADDR, decimals: 18, logo: "https://tokens.1inch.io/0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee.png" }
+  ];
+
+        let provider, signer, userAddress;
+        
+        let activeSide = 'sell';
+        let sellToken = DEFAULT_TOKENS[1]; // AERO
+        let buyToken = DEFAULT_TOKENS[0];  // USDC
+        let currentOdosQuote = null;
+        let swapTimer = null;
+
+        let monitoredPools =[];
+        let monitorInterval = null;
+        let isAutoRebalanceEnabled = false;
+		let isAutoCompoundEnabled = false;
+		 let useGasJar = false; 
+
+        
+function toggleGasJar() {
+    const modal = document.getElementById('gasJarModal');
+    if (!modal) return; 
+    
+    modal.classList.add('active');
+    
+    const checkbox = document.getElementById('jarToggleCheckbox');
+    if (checkbox) checkbox.checked = useGasJar;
+    
+    updateJarUIStrings();
+
+    if (provider && userAddress) {
+        const reserveAmt = document.getElementById('gasReserveAmount');
+        if (reserveAmt) {
+            reserveAmt.innerText = "Fetching...";
+            provider.getBalance(userAddress).then(bal => {
+                reserveAmt.innerText = parseFloat(ethers.formatEther(bal)).toFixed(5) + " ETH";
+            }).catch(() => { 
+                reserveAmt.innerText = "Error Reading"; 
+            });
+        }
+    }
+}
+
+function syncJarFromModal(isOn) {
+    useGasJar = isOn;
+    updateJarUIStrings();
+}
+
+function updateJarUIStrings() {
+    const btn = document.getElementById('btnGasJar');
+    const statusText = document.getElementById('gasJarStatusText');
+
+    if(useGasJar) {
+        if(btn) {
+            btn.innerText = "GAS JAR: ON";
+            btn.style.backgroundColor = "var(--text-main)";
+            btn.style.color = "var(--bg-body)";
+        }
+        if(statusText) {
+            statusText.innerText = "ACTIVE: Diverting 2%";
+            statusText.style.color = "#00b800";
+        }
+    } else {
+        if(btn) {
+            btn.innerText = "GAS JAR: OFF";
+            btn.style.backgroundColor = "var(--card-bg)";
+            btn.style.color = "var(--text-main)";
+        }
+        if(statusText) {
+            statusText.innerText = "INACTIVE";
+            statusText.style.color = "var(--text-dim)";
+        }
+    }
+}
+let rangeMode = 'pct'; 
+
+function setRangeMode(mode) {
+    rangeMode = mode;
+    const btnPct = document.getElementById('modePct');
+    const btnPrice = document.getElementById('modePrice');
+    const lblLow = document.getElementById('labelLower');
+    const lblHigh = document.getElementById('labelUpper');
+    const inpLow = document.getElementById('newPoolLower');
+    const inpHigh = document.getElementById('newPoolUpper');
+
+    if (mode === 'pct') {
+        btnPct.classList.add('active');
+        btnPrice.classList.remove('active');
+        lblLow.innerText = "Lower (- %)";
+        lblHigh.innerText = "Upper (+ %)";
+        inpLow.value = "10";
+        inpHigh.value = "10";
+    } else {
+        btnPrice.classList.add('active');
+        btnPct.classList.remove('active');
+        lblLow.innerText = "Lower Price";
+        lblHigh.innerText = "Upper Price";
+        inpLow.value = "";
+        inpHigh.value = "";
+        inpLow.placeholder = "0.00";
+        inpHigh.placeholder = "0.00";
+    }
+}
+function closeGasJarModal() {
+    const modal = document.getElementById('gasJarModal');
+    if (modal) modal.classList.remove('active');
+}
+       
+        let lowGasResolve = null;
+
+        function showLowGasModal(balanceStr) {
+            return new Promise((resolve) => {
+                lowGasResolve = resolve; 
+                document.getElementById('lowGasAmount').innerText = parseFloat(balanceStr).toFixed(5) + " ETH";
+                document.getElementById('lowGasModal').classList.add('active');
+            });
+        }
+
+        function closeLowGasModal() {
+            document.getElementById('lowGasModal').classList.remove('active');
+            if (lowGasResolve) {
+                lowGasResolve(); 
+                lowGasResolve = null;
+            }
+        }
+
+        async function checkLowGas() {
+            if(!provider || !userAddress) return;
+            try {
+                const ethBal = await provider.getBalance(userAddress);
+                if (ethBal < ethers.parseEther("0.0005")) { 
+                    await showLowGasModal(ethers.formatEther(ethBal)); 
+                }
+            } catch(e) {}
+        }
+async function executeClaimOnly(index, isAuto = false) {
+    const pool = monitoredPools[index];
+    if(!userAddress) return alert("Connect wallet!");
+    if(pool.isLoading || pool.isRebalancing) return;
+    
+    await checkLowGas();
+
+    pool.isLoading = true;
+    renderPools();
+
+    try {
+        const gauge = new ethers.Contract(pool.gaugeAddr, GAUGE_ABI, signer);
+        console.log(`Claiming AERO for NFT #${pool.nftId}...`);
+        
+        const tx = await gauge.getReward(pool.nftId);
+        await tx.wait();
+        
+        addHistoryLog("CLAIM", `Claimed ${pool.pendingAero} AERO from ${pool.pairName}`, 0, tx.hash);
+        
+        alert(`Successfully claimed ${pool.pendingAero} AERO!`);
+    } catch (e) {
+        console.error("Claim Error:", e);
+        if (!isAuto) alert("Claim failed. See console for details.");
+        pool.isLoading = false;
+        renderPools();
+        return false;
+    }
+    return true;
+    
+    pool.isLoading = false;
+    await fetchPoolData(index);
+    renderPools();
+}
+function toggleAutoCompound() {
+            const btn = document.getElementById('btnToggleCompound');
+            isAutoCompoundEnabled = !isAutoCompoundEnabled;
+            if(isAutoCompoundEnabled) {
+                alert("Auto-Compound Active! If a pool hits 5+ Pending AERO, it will automatically claim, swap, and add it to your position.");
+                btn.innerText = "AUTO-COMPOUND: ON"; btn.classList.add('active');
+            } else {
+                btn.innerText = "AUTO-COMPOUND: OFF"; btn.classList.remove('active');
+            }
+        }
+		async function executeCompound(index) {
+            const pool = monitoredPools[index];
+            if(!userAddress) return alert("Connect wallet!");
+            if(pool.isRebalancing || pool.isLoading) return;
+            
+            await checkLowGas(); 
+            
+            const currentAeroPrice = await getCachedPriceUSD(AERO_ADDR, 18);
+            const pendingUsdValue = parseFloat(pool.pendingAero) * currentAeroPrice;
+            if (pendingUsdValue < 0.05 && parseFloat(pool.pendingAero) > 0) {
+                const proceed = confirm(`⚠️ PROFIT WARNING: Your pending rewards are only worth $${pendingUsdValue.toFixed(3)}.\n\nThis is less than the network gas cost. Compounding now will lose you money!\n\nDo you still want to force a compound?`);
+                if (!proceed) {
+                    pool.autoCompound = false; 
+                    renderPools();
+                    return; 
+                }
+            }
+
+            if (parseFloat(pool.pendingAero) < 0.01) {
+                const proceed = confirm("⚠️ Your pending rewards are very small! The swap API might fail and cost you gas. Do you still want to force a compound?");
+                if (!proceed) {
+                    pool.autoCompound = false; 
+                    renderPools();
+                    return; 
+                }
+            }
+            pool.isRebalancing = true;
+            renderPools();
+            
+            try {
+               
+                console.log("Claiming AERO...");
+                const gauge = new ethers.Contract(pool.gaugeAddr, GAUGE_ABI, signer);
+                const aeroContract = new ethers.Contract(AERO_ADDR, ERC20_ABI, signer);
+                
+                const balBefore = await aeroContract.balanceOf(userAddress);
+                await (await gauge.getReward(pool.nftId)).wait();
+                const balAfter = await aeroContract.balanceOf(userAddress);
+                
+                const claimedWei = balAfter - balBefore;
+                
+                if (claimedWei > 0n) {
+                    console.log(`Claimed ${ethers.formatUnits(claimedWei, 18)} AERO! Swapping to compound...`);
+                    
+                    if (pool.t0Addr.toLowerCase() !== AERO_ADDR.toLowerCase() && pool.t1Addr.toLowerCase() !== AERO_ADDR.toLowerCase()) {
+                        
+                        let outputs = [{ tokenAddress: pool.t0Addr, proportion: 1 }];
+                        if (useGasJar) {
+                            outputs =[
+                                { tokenAddress: pool.t0Addr, proportion: 0.8 }, 
+                                { tokenAddress: "0x4200000000000000000000000000000000000006", proportion: 0.02 }
+                            ];
+                        }
+
+                        const qRes = await fetch("https://api.odos.xyz/sor/quote/v2", {
+                            method: "POST", headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({ chainId: BASE_CHAIN_ID, inputTokens:[{ tokenAddress: AERO_ADDR, amount: claimedWei.toString() }], outputTokens: outputs, userAddr: userAddress, slippageLimitPercent: 1.0, compact: true })
+                        });
+                        
+                        if(qRes.ok) {
+                            const qData = await qRes.json();
+                            const aRes = await fetch("https://api.odos.xyz/sor/assemble", {
+                                method: "POST", headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ userAddr: userAddress, pathId: qData.pathId, simulate: false })
+                            });
+                            
+                            if(aRes.ok) {
+                                const aData = await aRes.json();
+                                if(await aeroContract.allowance(userAddress, aData.transaction.to) < claimedWei) {
+                                    await (await aeroContract.approve(aData.transaction.to, ethers.MaxUint256)).wait();
+                                }
+                                await (await signer.sendTransaction({ to: aData.transaction.to, data: aData.transaction.data, value: aData.transaction.value })).wait();
+                            }
+                        }
+                    }
+                    
+                    if (pool.sizeUsd > 0) {
+                        const aeroPrice = await getCachedPriceUSD(AERO_ADDR, 18);
+                        const claimedUsd = parseFloat(ethers.formatUnits(claimedWei, 18)) * aeroPrice;
+                        pool.sizeUsd = parseFloat((pool.sizeUsd + claimedUsd).toFixed(2));
+                        savePoolsToStorage();
+                    }
+                    
+                    addHistoryLog("COMPOUND", `Claimed ${ethers.formatUnits(claimedWei, 18)} AERO and added to ${pool.pairName}`, 0, "");
+                }
+                
+                pool.isRebalancing = false;
+                
+                await executeRebalance(index);
+                
+            } catch (e) {
+                console.error("Compound Error:", e);
+                if (!isAuto) alert("Compounding Failed! Check Console.");
+                pool.isRebalancing = false;
+                renderPools();
+                return false;
+            }
+            return true;
+        }
+        let actionHistory = JSON.parse(localStorage.getItem('v3ActionHistory')) ||[];
+
+        function addHistoryLog(type, details, usdValue, txHash) {
+            const entry = {
+                id: Date.now(),
+                date: new Date().toLocaleString(),
+                type,
+                details,
+                usdValue: usdValue || 0,
+                hash: txHash || ""
+            };
+            actionHistory.unshift(entry); 
+            if (actionHistory.length > 50) actionHistory.pop(); 
+            localStorage.setItem('v3ActionHistory', JSON.stringify(actionHistory));
+            renderHistory();
+        }
+function toggleNightMode() {
+            document.body.classList.toggle('dark-mode');
+            const isDark = document.body.classList.contains('dark-mode');
+            localStorage.setItem('v3NightMode', isDark);
+            renderPools();
+        }
+        function renderHistory() {
+            const cont = document.getElementById('historyListContainer');
+            if (!cont) return;
+            cont.innerHTML = '';
+            
+            if(actionHistory.length === 0) {
+                cont.innerHTML = `<div style="text-align:center; padding: 40px; font-family:'Courier Prime'; border: 2px dashed #000; color:#888;">NO ACTIONS LOGGED YET</div>`;
+                return;
+            }
+
+            actionHistory.forEach(log => {
+                const row = document.createElement('div');
+                row.style.borderBottom = "1px solid #ddd";
+                row.style.padding = "15px 0";
+                row.style.display = "flex";
+                row.style.justifyContent = "space-between";
+                row.style.alignItems = "center";
+
+                const typeColor = log.type === 'SWAP' ? '#000' : (log.type === 'REBALANCE' ? 'blue' : 'green');
+                const hashLink = log.hash ? `<a href="https://basescan.org/tx/${log.hash}" target="_blank" style="color: blue; font-family:'Courier Prime'; font-size:12px; text-decoration:underline;">View on BaseScan ↗</a>` : '';
+
+                row.innerHTML = `
+                    <div>
+                        <div style="font-family:'Courier Prime'; font-size:11px; color:#888; margin-bottom:4px;">${log.date}</div>
+                        <div style="font-family:'Merriweather'; font-weight:900; font-size:16px;">
+                            <span style="background:${typeColor}; color:#fff; padding:3px 8px; font-size:10px; font-family:'Courier Prime'; vertical-align:middle; margin-right:8px; border-radius:2px;">${log.type}</span>
+                            ${log.details}
+                        </div>
+                    </div>
+                    <div style="text-align:right;">
+                        ${hashLink}
+                    </div>
+                `;
+                cont.appendChild(row);
+            });
+        }
+
+        function clearHistory() {
+            if(confirm("Clear all local history?")) {
+                actionHistory =[];
+                localStorage.removeItem('v3ActionHistory');
+                renderHistory();
+            }
+        }
+		async function connectWallet() {
+    if (!window.ethereum) return alert("Web3 wallet (like MetaMask) required!");
+    try {
+        provider = new ethers.BrowserProvider(window.ethereum);
+        
+        await window.ethereum.request({ method: 'eth_requestAccounts' });
+        
+        const network = await provider.getNetwork();
+        if (Number(network.chainId) !== BASE_CHAIN_ID) {
+            try {
+                await window.ethereum.request({ 
+                    method: 'wallet_switchEthereumChain', 
+                    params: [{ chainId: BASE_CHAIN_HEX }] 
+                });
+                provider = new ethers.BrowserProvider(window.ethereum);
+            } catch (switchError) {
+                alert("Please switch your wallet to the Base Network.");
+                return;
+            }
+        }
+
+        signer = await provider.getSigner();
+        userAddress = await signer.getAddress();
+        
+        const btn = document.getElementById('connectWallet');
+        btn.innerText = userAddress.substring(0, 6) + '...';
+        btn.style.background = "var(--card-bg)"; 
+        btn.style.color = "var(--text-main)";
+        
+        addHistoryLog("SYSTEM", "Wallet Connected via MetaMask", 0, "");
+        
+        fetchSwapBalances();
+        refreshAllPools();
+
+    } catch (e) { 
+        console.error(e); 
+        alert("Connection failed.");
+    }
+}
+		function editPoolSettings(index) {
+            const p = monitoredPools[index];
+            document.getElementById('editPoolIndex').value = index;
+            document.getElementById('editLow').value = p.lowMult || 10;
+            document.getElementById('editHigh').value = p.highMult || 10;
+            document.getElementById('editBuffer').value = p.buffer || 0;
+            document.getElementById('editShift').value = p.shiftTrigger || 0;
+            document.getElementById('editSize').value = p.sizeUsd || 0;
+            
+            document.getElementById('editStrategyModal').classList.add('active');
+        }
+
+        function closeEditModal() {
+            document.getElementById('editStrategyModal').classList.remove('active');
+        }
+
+function openStatusModal(title, message, isError = false) {
+    const titleEl = document.getElementById('statusTitle');
+    const textEl = document.getElementById('statusText');
+    const iconEl = document.getElementById('statusIcon');
+    const header = document.getElementById('statusHeader');
+
+    titleEl.innerText = title.toUpperCase();
+    textEl.innerText = message;
+    
+    const iconBaseStyle = "width: 60px; height: 60px; border: 3px solid #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto; box-shadow: 4px 4px 0px #000;";
+
+    if (isError) {
+        header.style.background = "#ff3333"; 
+        iconEl.innerHTML = `
+            <div style="${iconBaseStyle} background: #ff3333;">
+                <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </div>`;
+    } else {
+        header.style.background = "#00b800"; 
+        iconEl.innerHTML = `
+            <div style="${iconBaseStyle} background: #00b800;">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                </svg>
+            </div>`;
+    }
+
+    document.getElementById('statusModal').classList.add('active');
+}
+
+function closeStatusModal() {
+    document.getElementById('statusModal').classList.remove('active');
+}
+        function saveEditedStrategy() {
+            const index = document.getElementById('editPoolIndex').value;
+            if (index === "") return;
+            
+            const p = monitoredPools[index];
+           const editL = parseFloat(document.getElementById('editLow').value);
+            p.lowMult = isNaN(editL) ? p.lowMult : editL;
+            
+            const editH = parseFloat(document.getElementById('editHigh').value);
+            p.highMult = isNaN(editH) ? p.highMult : editH;
+			
+            p.buffer = parseInt(document.getElementById('editBuffer').value) || 0;
+            p.shiftTrigger = parseFloat(document.getElementById('editShift').value) || 0;
+            p.sizeUsd = parseFloat(document.getElementById('editSize').value) || 0;
+            
+            savePoolsToStorage();
+            renderPools();
+            closeEditModal();
+        }
+    async function init() {
+         if (localStorage.getItem('v3NightMode') === 'true') {
+            document.body.classList.add('dark-mode');
+        }
+		document.getElementById('connectWallet').addEventListener('click', connectWallet);
+        
+        const saved = localStorage.getItem('v3RebalancePools');
+        if(saved) {
+            monitoredPools = JSON.parse(saved).map(p => ({
+                address: p.address,
+                lowMult: p.lowMult || 10,    
+                highMult: p.highMult || 10,  
+                buffer: p.buffer || 1,             
+               sizeUsd: p.sizeUsd || 0,    
+autoHarvest: p.autoHarvest || false, 
+			   shiftTrigger: p.shiftTrigger || 0,
+
+                compoundThreshold: p.compoundThreshold || 5, 
+                autoCompound: p.autoCompound || false,
+                stakeNFT: p.stakeNFT !== false,
+                lastRebalanceTime: p.lastRebalanceTime || Date.now(),
+                pairName: "Loading...",
+				                priority: p.priority, 
+
+                nftId: "0",
+                outOfBounds: false,
+                isLoading: false,
+                isRebalancing: false
+            }));
+            renderPools();
+        }
+        updateSwapUI();
+        renderHistory(); 
+    }
+
+function openPKModal() {
+    document.getElementById('pkModal').classList.add('active');
+    document.getElementById('pkInput').value = ""; 
+}
+
+function closePKModal() {
+    document.getElementById('pkModal').classList.remove('active');
+}
+
+async function handlePKConnect() {
+    const pkInput = document.getElementById('pkInput');
+    let pk = pkInput.value.trim();
+    
+    if (!pk) {
+        openStatusModal("Missing Key", "Please enter a valid private key.", true);
+        return;
+    }
+
+    if (!pk.startsWith("0x") && pk.length === 64) pk = "0x" + pk;
+
+    const connectBtn = document.getElementById('connectWallet');
+    connectBtn.innerText = "INITIALIZING...";
+    connectBtn.disabled = true;
+
+    try {
+        // Switch to a more stable Public RPC or (Get Paid RPC its better for bots)
+        const rpcUrl = "https://base-mainnet.public.blastapi.io"; 
+        
+        const rpcProvider = new ethers.JsonRpcProvider(rpcUrl, {
+            chainId: 8453,
+            name: 'base'
+        }, { staticNetwork: true });
+
+        const botWallet = new ethers.Wallet(pk, rpcProvider);
+        
+        provider = rpcProvider;
+        signer = botWallet;
+        userAddress = botWallet.address;
+
+        connectBtn.innerText = "BOT: " + userAddress.substring(0, 6) + "...";
+        connectBtn.style.backgroundColor = "#00b800";
+        connectBtn.style.color = "#ffffff";
+        connectBtn.disabled = false;
+
+        pkInput.value = ""; 
+        closePKModal();
+
+        openStatusModal("Bot Mode Activated", "Connected to Base via Public RPC. High stability mode enabled.");
+
+        fetchSwapBalances();
+        refreshAllPools();
+
+    } catch (e) {
+        console.error("Bot Mode Error:", e);
+        connectBtn.innerText = "CONNECT WALLET";
+        connectBtn.disabled = false;
+        openStatusModal("Connection Failed", "Invalid Key or RPC Timeout.", true);
+    }
+}
+
+function togglePoolAutoCompound(index) {
+            monitoredPools[index].autoCompound = !monitoredPools[index].autoCompound;
+            savePoolsToStorage();
+            renderPools();
+            
+            if (monitoredPools[index].autoCompound) {
+                executeCompound(index);
+            }
+        }
+let memoryWallet = null;
+
+async function connectWithPrivateKey() {
+    let pk = prompt("⚠️ DANGER: Enter a BURNER WALLET Private Key.\n\nThis key will only be stored in your browser's temporary memory and will be erased when you close this tab.");
+    
+    if (!pk) return; 
+
+    try {
+        if (!pk.startsWith("0x")) {
+            pk = "0x" + pk;
+        }
+
+        const rpcProvider = new ethers.JsonRpcProvider("https://mainnet.base.org");
+        
+        memoryWallet = new ethers.Wallet(pk, rpcProvider);
+        
+        provider = rpcProvider;
+        signer = memoryWallet;
+        userAddress = memoryWallet.address;
+
+        document.getElementById('connectWallet').innerText = "BOT: " + userAddress.substring(0, 6) + '...';
+        
+        alert(`Connected silently! This tab will now sign transactions automatically for ${userAddress}. Keep the tab open.`);
+        
+        fetchSwapBalances();
+        refreshAllPools();
+
+    } catch (e) {
+        console.error(e);
+        alert("Invalid Private Key format.");
+    }
+}
+
+        function switchTab(t) {
+    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.view-section').forEach(v => v.classList.remove('active'));
+    
+    let idx;
+    if (t === 'swap') idx = 1;
+    else if (t === 'rebalance') idx = 2;
+    else if (t === 'history') idx = 3;
+    else if (t === 'info') idx = 4; 
+
+    document.querySelector(`.tab-btn:nth-child(${idx})`).classList.add('active');
+    document.getElementById(t + '-view').classList.add('active');
+}
+
+       
+
+        async function fetchSwapBalances() {
+            if(!userAddress || !provider) return;
+            async function getBal(t) {
+                try {
+                    if (t.address === ZERO_ADDR) return ethers.formatUnits(await provider.getBalance(userAddress), 18);
+                    const c = new ethers.Contract(t.address, ERC20_ABI, provider);
+                    return ethers.formatUnits(await c.balanceOf(userAddress), t.decimals);
+                } catch(e) { return "0"; }
+            }
+            document.getElementById('sellBalance').innerText = "Bal: " + parseFloat(await getBal(sellToken)).toFixed(4);
+            document.getElementById('buyBalance').innerText = "Bal: " + parseFloat(await getBal(buyToken)).toFixed(4);
+        }
+
+       function updateSwapUI() {
+    document.getElementById('sSym').innerText = sellToken.symbol;
+    document.getElementById('bSym').innerText = buyToken.symbol;
+    
+    const sLogo = sellToken.logo || `https://dd.dexscreener.com/ds-data/tokens/base/${sellToken.address.toLowerCase()}.png`;
+    const bLogo = buyToken.logo || `https://dd.dexscreener.com/ds-data/tokens/base/${buyToken.address.toLowerCase()}.png`;
+    
+    document.getElementById('sIcon').src = sLogo;
+    document.getElementById('bIcon').src = bLogo;
+    fetchSwapBalances();
+}
+
+        function flipSwapTokens() {
+            const temp = sellToken; sellToken = buyToken; buyToken = temp;
+            document.getElementById('inpAmt').value = ""; document.getElementById('outAmt').value = "";
+            document.getElementById('swapRouteLog').style.display = 'none';
+            document.getElementById('btnDirectSwap').disabled = true;
+            document.getElementById('btnDirectSwap').innerText = "ENTER AMOUNT";
+            updateSwapUI();
+        }
+
+        function openModal(side) { activeSide = side; document.getElementById('tokenModal').classList.add('active'); renderTokenList(DEFAULT_TOKENS); }
+        function closeModal() { document.getElementById('tokenModal').classList.remove('active'); }
+
+     let dexSearchTimer = null;
+
+async function searchTokens(q) {
+    clearTimeout(dexSearchTimer);
+    q = q.trim();
+    const list = document.getElementById('modalList');
+
+    if (!q) {
+        renderTokenList(DEFAULT_TOKENS);
+        return;
+    }
+
+    list.innerHTML = `<div style="padding:20px; text-align:center; font-family:'Courier Prime'; font-weight:bold;">Searching...</div>`;
+
+    dexSearchTimer = setTimeout(async () => {
+        try {
+            const res = await fetch(`https://api.dexscreener.com/latest/dex/search?q=${encodeURIComponent(q)}`);
+            const data = await res.json();
+            
+            const basePairs = (data.pairs ||[]).filter(p => p.chainId === 'base');
+            const uniqueTokens = new Map();
+
+            DEFAULT_TOKENS.forEach(t => {
+                if (t.symbol.toUpperCase().includes(q.toUpperCase()) || t.address.toLowerCase() === q.toLowerCase()) {
+                    uniqueTokens.set(t.address.toLowerCase(), t);
+                }
+            });
+
+            for (const pair of basePairs) {
+                if (uniqueTokens.size >= 15) break; 
+                
+                const tokens = [pair.baseToken, pair.quoteToken];
+                
+                tokens.forEach(t => {
+                    const matchesQuery = t.symbol.toUpperCase().includes(q.toUpperCase()) || t.address.toLowerCase() === q.toLowerCase();
+                    if (t && t.address && !uniqueTokens.has(t.address.toLowerCase()) && matchesQuery) {
+                        uniqueTokens.set(t.address.toLowerCase(), {
+                            symbol: t.symbol,
+                            address: t.address,
+                            decimals: null, 
+                            logo: `https://dd.dexscreener.com/ds-data/tokens/base/${t.address.toLowerCase()}.png`
+                        });
+                    }
+                });
+            }
+
+            let results = Array.from(uniqueTokens.values());
+
+            if (ethers.isAddress(q) && results.length === 0) {
+                results.push({ symbol: "Unknown", address: q, decimals: null });
+            }
+
+            if (results.length === 0) {
+                list.innerHTML = `<div style="padding:20px; text-align:center; font-family:'Courier Prime';">No tokens found on Base.</div>`;
+                return;
+            }
+
+            list.innerHTML = `<div style="padding:20px; text-align:center; font-family:'Courier Prime'; font-weight:bold;">Fetching Decimals...</div>`;
+
+            const rpc = provider || new ethers.JsonRpcProvider("https://base.meowrpc.com");
+            
+            results = await Promise.all(results.map(async (t) => {
+                if (t.decimals !== null && t.decimals !== undefined) return t;
+                
+                try {
+                    const c = new ethers.Contract(t.address, ERC20_ABI, rpc);
+                    const [sym, dec] = await Promise.all([
+                        c.symbol().catch(() => t.symbol), 
+                        c.decimals()
+                    ]);
+                    return { ...t, symbol: sym, decimals: Number(dec) };
+                } catch(e) {
+                    return null;
+                }
+            }));
+
+            results = results.filter(t => t !== null);
+
+            renderTokenList(results);
+
+        } catch (e) {
+            console.error("DexScreener Search Error:", e);
+            list.innerHTML = `<div style="padding:20px; text-align:center; font-family:'Courier Prime'; color:red;">Search failed. Check console.</div>`;
+        }
+    }, 600);
+}
+
+        function renderTokenList(tokens) {
+    const list = document.getElementById('modalList');
+    list.innerHTML = '';
+    tokens.forEach(t => {
+        const row = document.createElement('div');
+        row.className = 'modal-token-row';
+        
+        const imgSrc = t.logo || `https://dd.dexscreener.com/ds-data/tokens/base/${t.address.toLowerCase()}.png`;
+        
+        row.innerHTML = `
+            <img src="${imgSrc}" style="width:28px;height:28px;border-radius:50%;border:1px solid #000;" onerror="this.src='https://placehold.co/28x28/black/white?text=?'">
+            <div>
+                <div style="font-weight:900; font-family:'Merriweather';">${t.symbol}</div>
+                <div style="font-size:10px; font-family:'Courier Prime';">${t.address.substring(0,10)}...</div>
+            </div>`;
+        row.onclick = () => { 
+            if(activeSide==='sell') sellToken=t; else buyToken=t; 
+            closeModal(); updateSwapUI(); debounceSwapQuote(); 
+        };
+        list.appendChild(row);
+    });
+}
+        
+
+        function debounceSwapQuote() { clearTimeout(swapTimer); swapTimer = setTimeout(fetchDirectQuote, 600); }
+
+        async function fetchDirectQuote() {
+            const amt = document.getElementById('inpAmt').value;
+            const btn = document.getElementById('btnDirectSwap');
+            const log = document.getElementById('swapRouteLog');
+            
+            if(!amt || parseFloat(amt) <= 0) { 
+                log.style.display = 'none'; btn.disabled = true; btn.innerText = "ENTER AMOUNT"; 
+                document.getElementById('outAmt').value = ""; return; 
+            }
+
+            btn.innerText = "FETCHING QUOTE..."; btn.disabled = true;
+            log.style.display = 'block'; log.innerText = "[ FETCHING ODOS ROUTE ]";
+
+            try {
+                const amtWei = ethers.parseUnits(amt, sellToken.decimals).toString();
+                
+                const reqBody = {
+                    chainId: BASE_CHAIN_ID,
+                    inputTokens:[{ tokenAddress: sellToken.address === ZERO_ADDR ? "0x0000000000000000000000000000000000000000" : sellToken.address, amount: amtWei }],
+                    outputTokens:[{ tokenAddress: buyToken.address === ZERO_ADDR ? "0x0000000000000000000000000000000000000000" : buyToken.address, proportion: 1 }],
+                    userAddr: userAddress || "0x0000000000000000000000000000000000000001",
+                    slippageLimitPercent: 0.5, compact: true
+                };
+
+                const res = await fetch("https://api.odos.xyz/sor/quote/v2", {
+                    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(reqBody)
+                });
+
+                if(!res.ok) throw new Error("Odos API Error");
+                currentOdosQuote = await res.json();
+                
+                const outVal = ethers.formatUnits(currentOdosQuote.outAmounts[0], buyToken.decimals);
+                document.getElementById('outAmt').value = parseFloat(outVal).toFixed(6);
+
+                log.innerText = `[ ROUTE FOUND: ODOS ]`;
+                btn.innerText = "SWAP NOW"; btn.disabled = false;
+
+            } catch(e) { console.error(e); btn.innerText = "NO ROUTE"; log.innerText = "[ ERROR FETCHING ]"; }
+        }
+
+        async function executeDirectSwap() {
+            if(!userAddress) return alert("Connect Wallet first");
+            if(!currentOdosQuote) return;
+            const btn = document.getElementById('btnDirectSwap');
+            const log = document.getElementById('swapRouteLog');
+            btn.disabled = true; btn.innerText = "PREPARING...";
+
+            try {
+                log.innerText = "[ ASSEMBLING TX ]";
+                const aRes = await fetch("https://api.odos.xyz/sor/assemble", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ userAddr: userAddress, pathId: currentOdosQuote.pathId, simulate: false })
+                });
+                if(!aRes.ok) throw new Error("Assembly Failed");
+                const txData = await aRes.json();
+
+                if (sellToken.address !== ZERO_ADDR) {
+                     log.innerText = "[ CHECKING ALLOWANCE ]";
+                     const c = new ethers.Contract(sellToken.address, ERC20_ABI, signer);
+                     const amtWei = ethers.parseUnits(document.getElementById('inpAmt').value, sellToken.decimals);
+                     const all = await c.allowance(userAddress, txData.transaction.to);
+                     
+                     if(all < amtWei) {
+                         btn.innerText = "APPROVING...";
+                         log.innerText = "[ WAITING FOR APPROVAL TX ]";
+                         const appTx = await c.approve(txData.transaction.to, ethers.MaxUint256);
+                         await appTx.wait();
+                     }
+                }
+
+                btn.innerText = "SIGNING TX...";
+                log.innerText = "[ WAITING FOR SWAP TX ]";
+                const tx = await signer.sendTransaction({
+                    to: txData.transaction.to, data: txData.transaction.data, value: txData.transaction.value
+                });
+                
+               btn.innerText = "SWAPPING..."; 
+                await tx.wait();
+                
+                const amt = document.getElementById('inpAmt').value;
+                const outAmt = document.getElementById('outAmt').value;
+                const priceUsd = await getCachedPriceUSD(sellToken.address, sellToken.decimals);
+                const totalUsd = parseFloat(amt) * priceUsd;
+                addHistoryLog("SWAP", `Swapped ${amt} ${sellToken.symbol} for ${parseFloat(outAmt).toFixed(4)} ${buyToken.symbol}`, totalUsd, tx.hash);
+
+                btn.innerText = "SUCCESS";
+                log.innerText = "[ SWAP COMPLETE ]";
+                fetchSwapBalances(); 
+                document.getElementById('inpAmt').value = ""; document.getElementById('outAmt').value = "";
+                setTimeout(() => { btn.innerText = "ENTER AMOUNT"; log.style.display = 'none'; }, 3000);
+
+            } catch(e) { 
+                console.error(e); alert("Swap Failed"); 
+                btn.innerText = "TRY AGAIN"; btn.disabled = false; log.innerText = "[ FAILED ]";
+            }
+        }
+
+
+        
+function togglePoolAutoHarvest(index) {
+    const pool = monitoredPools[index];
+    pool.autoHarvest = !pool.autoHarvest;
+    
+    if (pool.autoHarvest) {
+        pool.autoCompound = false;
+        if (parseFloat(pool.pendingAero) >= (pool.compoundThreshold || 5)) {
+            executeClaimOnly(index);
+        }
+    }
+    
+    savePoolsToStorage();
+    renderPools();
+}
+
+function togglePoolAutoCompound(index) {
+    const pool = monitoredPools[index];
+    pool.autoCompound = !pool.autoCompound;
+    
+    if (pool.autoCompound) {
+        pool.autoHarvest = false; 
+        executeCompound(index);
+    }
+    
+    savePoolsToStorage();
+    renderPools();
+}
+     function savePoolsToStorage() {
+            const dataToSave = monitoredPools.map(p => ({ 
+                address: p.address, 
+                lowMult: p.lowMult, 
+                highMult: p.highMult,
+                buffer: p.buffer,
+                sizeUsd: p.sizeUsd,
+				shiftTrigger: p.shiftTrigger || 0,
+
+				autoHarvest: p.autoHarvest || false, 
+                priority: p.priority, 
+
+                compoundThreshold: p.compoundThreshold || 5, 
+                autoCompound: p.autoCompound || false,
+                stakeNFT: p.stakeNFT !== false, 
+                lastRebalanceTime: p.lastRebalanceTime || Date.now() 
+            }));
+            localStorage.setItem('v3RebalancePools', JSON.stringify(dataToSave));
+        }
+
+      async function addPool() {
+    if(!userAddress) return alert("Connect wallet!");
+    const addr = document.getElementById('newPoolAddr').value.trim();
+    if(!ethers.isAddress(addr)) return alert("Invalid Address");
+
+    let lowMult = parseFloat(document.getElementById('newPoolLower').value);
+    let highMult = parseFloat(document.getElementById('newPoolUpper').value);
+    const buffer = parseInt(document.getElementById('newPoolBuffer').value) || 0;
+    const sizeUsd = parseFloat(document.getElementById('newPoolSize').value) || 0;
+    
+    // Pull the missing values:
+    const cmpdTarget = parseFloat(document.getElementById('newPoolCmpd').value) || 5;
+    const shiftTrig = parseFloat(document.getElementById('newPoolShift').value) || 0;
+
+    // Price Mode calculation logic
+    if (rangeMode === 'price') {
+        try {
+            const tempPool = new ethers.Contract(addr, POOL_ABI, provider);
+            const [slot0, t0, t1] = await Promise.all([tempPool.slot0(), tempPool.token0(), tempPool.token1()]);
+            const token0 = new ethers.Contract(t0, ERC20_ABI, provider);
+            const token1 = new ethers.Contract(t1, ERC20_ABI, provider);
+            const [dec0, dec1] = await Promise.all([token0.decimals(), token1.decimals()]);
+            
+            const currentPrice = (Math.pow(1.0001, Number(slot0.tick)) * Math.pow(10, Number(dec0) - Number(dec1)));
+            
+            lowMult = ((currentPrice - lowMult) / currentPrice) * 100;
+            highMult = ((highMult - currentPrice) / currentPrice) * 100;
+
+            if (lowMult < 0 || highMult < 0) {
+                alert("Error: Lower price must be below current price, and Upper must be above.");
+                return;
+            }
+        } catch (e) {
+            console.error(e);
+            alert("Could not fetch pool price for calculation. Check address.");
+            return;
+        }
+    }
+
+    monitoredPools.push({ 
+        address: addr, 
+        lowMult: parseFloat(lowMult.toFixed(2)), 
+        highMult: parseFloat(highMult.toFixed(2)), 
+        buffer: buffer,
+        shiftTrigger: shiftTrig, 
+        sizeUsd: sizeUsd, 
+        stakeNFT: true, 
+        lastRebalanceTime: Date.now(), 
+        compoundThreshold: cmpdTarget, 
+        pairName: "Loading...", 
+        nftId: "0", 
+        outOfBounds: false, 
+        isLoading: true, 
+        isRebalancing: false 
+    });
+    
+    savePoolsToStorage();
+    document.getElementById('newPoolAddr').value = "";
+    document.getElementById('newPoolShift').value = "";
+    renderPools();
+    await fetchPoolData(monitoredPools.length - 1);
+    renderPools();
+}
+async function toggleStake(index) {
+            const pool = monitoredPools[index];
+            if (!userAddress) return alert("Connect wallet!");
+
+            const newState = !pool.stakeNFT;
+            
+            if (pool.nftId !== "0" && pool.gaugeAddr && pool.gaugeAddr !== ZERO_ADDR) {
+                pool.isLoading = true;
+                renderPools();
+                try {
+                    const gauge = new ethers.Contract(pool.gaugeAddr, GAUGE_ABI, signer);
+                    const nfpm = new ethers.Contract(NFPM_ADDRESS, NFPM_ABI, signer);
+
+                    if (newState && !pool.isStaked) {
+                        console.log("Approving NFT to Gauge...");
+                        await (await nfpm.approve(pool.gaugeAddr, pool.nftId)).wait();
+                        console.log("Depositing...");
+                        await (await gauge.deposit(pool.nftId)).wait();
+                    } else if (!newState && pool.isStaked) {
+                        console.log("Unstaking from Gauge...");
+                        await (await gauge.withdraw(pool.nftId)).wait();
+                    }
+                } catch(e) {
+                    console.error("Stake toggle error:", e);
+                    alert("Transaction failed! Did you reject it?");
+                    pool.isLoading = false;
+                    renderPools();
+                    return;
+                }
+            }
+
+            pool.stakeNFT = newState;
+            savePoolsToStorage();
+            await fetchPoolData(index);
+			            renderPools();
+
+        }
+        async function removePool(index) {
+            const pool = monitoredPools[index];
+            
+            if (pool.nftId !== "0") {
+                const wantToClose = confirm(`⚠️ ACTIVE POSITION DETECTED! ⚠️\n\nYou have NFT #${pool.nftId} active in this pool.\n\nDo you want to CLOSE THE POSITION (Unstake + Withdraw all tokens + Collect Rewards) before removing it from the dashboard?\n\n- Click [OK] to CLOSE POSITION on-chain.\n- Click[Cancel] to keep the position and just remove the pool from the UI.`);
+                
+                if (wantToClose) {
+                    const success = await closePosition(index);
+                    if (!success) return; 
+                } else {
+                    
+                    if (!confirm("Remove pool from dashboard without closing the position?")) return;
+                }
+            } else {
+                if (!confirm("Remove pool from dashboard?")) return;
+            }
+
+            monitoredPools.splice(index, 1);
+            savePoolsToStorage();
+            renderPools();
+        }
+
+       
+    
+async function fetchPoolData(index) {
+    if (!userAddress || !provider) return;
+    const pool = monitoredPools[index];
+    pool.isLoading = true;
+
+    try {
+        const poolContract = new ethers.Contract(pool.address, POOL_ABI, provider);
+        const [slot0, spacing, t0, t1, gaugeAddr] = await Promise.all([
+            poolContract.slot0(), 
+            poolContract.tickSpacing(), 
+            poolContract.token0(), 
+            poolContract.token1(), 
+            poolContract.gauge().catch(() => ZERO_ADDR)
+        ]);
+
+        pool.currentTick = Number(slot0.tick);
+        pool.tickSpacing = Number(spacing);
+        pool.t0Addr = t0;
+        pool.t1Addr = t1;
+        pool.gaugeAddr = gaugeAddr;
+
+        const token0 = new ethers.Contract(t0, ERC20_ABI, provider);
+        const token1 = new ethers.Contract(t1, ERC20_ABI, provider);
+        const [sym0, sym1, dec0Raw, dec1Raw] = await Promise.all([
+            token0.symbol(), token1.symbol(), token0.decimals(), token1.decimals()
+        ]);
+        
+        const dec0 = Number(dec0Raw);
+        const dec1 = Number(dec1Raw);
+        pool.pairName = `${sym0} / ${sym1}`;
+
+        const rawPrice = Math.pow(1.0001, pool.currentTick);
+        const decimalAdjustment = Math.pow(10, dec0 - dec1);
+        pool.humanPrice = (rawPrice * decimalAdjustment).toFixed(5);
+
+        pool.calcPriceFromTick = (tick) => {
+            return (Math.pow(1.0001, tick) * decimalAdjustment).toFixed(5);
+        };
+
+        pool.nftId = "0"; 
+        pool.outOfBounds = false;
+        pool.isStaked = false;
+        pool.liquidityRaw = 0n;
+const isNftAssignedToAnotherPool = (tIdStr) => {
+            return monitoredPools.some((p, idx) => idx !== index && p.nftId === tIdStr);
+        };
+        const nfpm = new ethers.Contract(NFPM_ADDRESS, NFPM_ABI, provider);
+
+        if (gaugeAddr !== ZERO_ADDR) {
+            const gauge = new ethers.Contract(gaugeAddr, GAUGE_ABI, provider);
+            try {
+                const stakedList = await gauge.stakedValues(userAddress);
+                for (let i = 0; i < stakedList.length; i++) {
+                    const tId = stakedList[i].toString();
+                    const pos = await nfpm.positions(tId);
+                    
+                    if (pos.token0.toLowerCase() === t0.toLowerCase() && 
+                        pos.token1.toLowerCase() === t1.toLowerCase() && 
+                        Number(pos.tickSpacing) === pool.tickSpacing && 
+                        pos.liquidity > 0n &&
+                        !isNftAssignedToAnotherPool(tId)) { 
+                        
+                        pool.nftId = tId;
+                        pool.isStaked = true;
+                        pool.tickLower = Number(pos.tickLower);
+                        pool.tickUpper = Number(pos.tickUpper);
+                        pool.liquidityRaw = pos.liquidity;
+                        break;
+                    }
+                }
+            } catch(e) { console.warn("Gauge read error", e); }
+        }
+
+        if (pool.nftId === "0") {
+            const bal = await nfpm.balanceOf(userAddress);
+            for (let i = 0; i < bal; i++) {
+                const tokenId = await nfpm.tokenOfOwnerByIndex(userAddress, i);
+                const pos = await nfpm.positions(tokenId);
+                const tIdStr = tokenId.toString();
+                
+                if (pos.token0.toLowerCase() === t0.toLowerCase() && 
+                    pos.token1.toLowerCase() === t1.toLowerCase() && 
+                    Number(pos.tickSpacing) === pool.tickSpacing && 
+                    pos.liquidity > 0n &&
+                    !isNftAssignedToAnotherPool(tIdStr)) { 
+                    
+                    pool.nftId = tIdStr;
+                    pool.tickLower = Number(pos.tickLower);
+                    pool.tickUpper = Number(pos.tickUpper);
+                    pool.liquidityRaw = pos.liquidity;
+                    break;
+                }
+            }
+        }
+        pool.pendingAero = "0.00";
+        pool.dailyAero = 0;
+        pool.apr = 0;
+        pool.feeApr = 0;
+        pool.pendingFeesUsd = 0;
+        pool.pending0Str = "0.00";
+        pool.pending1Str = "0.00";
+
+        if (pool.nftId !== "0") {
+           const centerTick = (pool.tickLower + pool.tickUpper) / 2;
+            const centerPriceRaw = Math.pow(1.0001, centerTick);
+            const centerPrice = centerPriceRaw * Math.pow(10, dec0 - dec1);
+            const currPrice = parseFloat(pool.humanPrice);
+            
+            pool.currentShiftPct = Math.abs(currPrice - centerPrice) / centerPrice * 100;
+            pool.shiftTriggered = pool.shiftTrigger > 0 && pool.currentShiftPct >= pool.shiftTrigger;
+            const rangeWidth = pool.tickUpper - pool.tickLower;
+            const bufferTicks = Math.floor((rangeWidth * (pool.buffer || 0)) / 100);
+            pool.outOfBounds = (pool.currentTick <= pool.tickLower + bufferTicks) || 
+                               (pool.currentTick >= pool.tickUpper - bufferTicks);
+
+            const price0 = await getCachedPriceUSD(pool.t0Addr, dec0);
+            const price1 = await getCachedPriceUSD(pool.t1Addr, dec1);
+
+            let tvlUSD = 0;
+            if (price0 > 0 && price1 > 0) {
+                const sqrtCurrent = Math.pow(1.0001, pool.currentTick / 2);
+                const sqrtLower = Math.pow(1.0001, pool.tickLower / 2);
+                const sqrtUpper = Math.pow(1.0001, pool.tickUpper / 2);
+                const myLiq = Number(pool.liquidityRaw);
+                
+                let amt0 = 0, amt1 = 0;
+                if (pool.currentTick < pool.tickLower) {
+                    amt0 = myLiq * (sqrtUpper - sqrtLower) / (sqrtLower * sqrtUpper);
+                } else if (pool.currentTick >= pool.tickUpper) {
+                    amt1 = myLiq * (sqrtUpper - sqrtLower);
+                } else {
+                    amt0 = myLiq * (sqrtUpper - sqrtCurrent) / (sqrtCurrent * sqrtUpper);
+                    amt1 = myLiq * (sqrtCurrent - sqrtLower);
+                }
+                tvlUSD = ((amt0 / Math.pow(10, dec0)) * price0) + ((amt1 / Math.pow(10, dec1)) * price1);
+            }
+
+            if (pool.isStaked && pool.gaugeAddr !== ZERO_ADDR) {
+                const gauge = new ethers.Contract(pool.gaugeAddr, GAUGE_ABI, provider);
+                try {
+                    const earned = await gauge.earned(userAddress, pool.nftId);
+                    pool.pendingAero = parseFloat(ethers.formatUnits(earned, 18)).toFixed(6);
+                    
+                    if (!pool.outOfBounds) {
+                        const [rewardRate, poolActiveLiquidity] = await Promise.all([
+                            gauge.rewardRate(), 
+                            poolContract.liquidity()
+                        ]);
+                        const rRate = parseFloat(ethers.formatUnits(rewardRate, 18));
+                        const pLiq = Number(poolActiveLiquidity);
+                        if (pLiq > 0 && tvlUSD > 0) {
+                            const myShare = Number(pool.liquidityRaw) / pLiq;
+                            pool.dailyAero = myShare * rRate * 86400; 
+                            const aeroPrice = await getCachedPriceUSD(AERO_ADDR, 18);
+                            if (aeroPrice > 0) {
+                                pool.apr = (((pool.dailyAero * 365 * aeroPrice) / tvlUSD) * 100).toFixed(2);
+                            }
+                        }
+                    }
+                } catch(e) { console.warn("Reward calc error", e); }
+            }
+
+            if (!pool.isStaked) {
+                const MAX_UINT128 = 340282366920938463463374607431768211455n;
+                try {
+                    const pending = await nfpm.collect.staticCall({
+                        tokenId: pool.nftId, recipient: userAddress,
+                        amount0Max: MAX_UINT128, amount1Max: MAX_UINT128
+                    });
+                    const p0 = parseFloat(ethers.formatUnits(pending[0], dec0));
+                    const p1 = parseFloat(ethers.formatUnits(pending[1], dec1));
+                    pool.pending0Str = p0.toFixed(4);
+                    pool.pending1Str = p1.toFixed(4);
+                    
+                    if (price0 > 0 && price1 > 0) {
+                        pool.pendingFeesUsd = (p0 * price0) + (p1 * price1);
+                        if (tvlUSD > 0 && pool.lastRebalanceTime) {
+                            const elapsedMs = Date.now() - pool.lastRebalanceTime;
+                            if (elapsedMs > 60000) {
+                                const yearlyFees = pool.pendingFeesUsd * (31536000000 / elapsedMs);
+                                pool.feeApr = ((yearlyFees / tvlUSD) * 100).toFixed(2);
+                            }
+                        }
+                    }
+                } catch (e) { }
+            }
+            
+            pool.priceLower = pool.calcPriceFromTick(pool.tickLower);
+            pool.priceUpper = pool.calcPriceFromTick(pool.tickUpper);
+            const currP = parseFloat(pool.humanPrice);
+            pool.pctLower = (((parseFloat(pool.priceLower) - currP) / currP) * 100).toFixed(2);
+            pool.pctUpper = (((parseFloat(pool.priceUpper) - currP) / currP) * 100).toFixed(2);
+        }
+		
+    } catch (e) { console.error("fetchPoolData error:", e); pool.pairName = "Load Error"; }
+    
+    pool.isLoading = false;
+
+    const threshold = parseFloat(pool.compoundThreshold || 5);
+    const pending = parseFloat(pool.pendingAero);
+
+    if (!pool.isRebalancing && !pool.isLoading && pool.nftId !== "0") {
+        
+if (isAutoRebalanceEnabled && (pool.outOfBounds || pool.shiftTriggered)) {
+
+            console.log(`[AUTO] Out of Bounds detected for ${pool.pairName}. Triggering Rebalance...`);
+            executeRebalance(index);
+        } 
+        else if (!pool.outOfBounds && pending >= threshold) {
+            if (pool.autoCompound || isAutoCompoundEnabled) {
+                console.log(`[AUTO] Compound threshold reached for ${pool.pairName}. Triggering Compound...`);
+                executeCompound(index);
+            } else if (pool.autoHarvest) {
+                console.log(`[AUTO] Harvest threshold reached for ${pool.pairName}. Triggering Claim...`);
+                executeClaimOnly(index);
+            }
+        }
+    }
+}
+
+        
+        let actionQueue =[];
+        let isQueuePaused = false;
+
+        function handlePriorityScroll(event, index) {
+            event.preventDefault(); 
+            let pool = monitoredPools[index];
+            if (!pool.priority) pool.priority = index + 1;
+
+            if (event.deltaY > 0) pool.priority++; 
+            else pool.priority--; 
+            
+            if (pool.priority < 1) pool.priority = 1; 
+
+            savePoolsToStorage();
+            document.getElementById(`priority-val-${index}`).innerText = pool.priority;
+        }
+
+        function randomizePriority(index) {
+            monitoredPools[index].priority = Math.floor(Math.random() * 99) + 1;
+            savePoolsToStorage();
+            document.getElementById(`priority-val-${index}`).innerText = monitoredPools[index].priority;
+        }
+
+        async function processAutomations() {
+            if (isQueuePaused || actionQueue.length > 0) return; 
+            
+            monitoredPools.forEach((pool, index) => {
+                const threshold = parseFloat(pool.compoundThreshold || 5);
+                const pending = parseFloat(pool.pendingAero);
+
+                if (!pool.isRebalancing && !pool.isLoading && pool.nftId !== "0") {
+if (isAutoRebalanceEnabled && (pool.outOfBounds || pool.shiftTriggered)) {
+                        actionQueue.push({ index, type: 'REBALANCE', priority: pool.priority || (index+1), name: pool.pairName });
+                    } else if (!pool.outOfBounds && pending >= threshold) {
+                        if (pool.autoCompound || isAutoCompoundEnabled) {
+                            actionQueue.push({ index, type: 'COMPOUND', priority: pool.priority || (index+1), name: pool.pairName });
+                        } else if (pool.autoHarvest) {
+                            actionQueue.push({ index, type: 'HARVEST', priority: pool.priority || (index+1), name: pool.pairName });
+                        }
+                    }
+                }
+            });
+
+            if (actionQueue.length === 0) return;
+
+            actionQueue.sort((a, b) => a.priority - b.priority);
+
+            while (actionQueue.length > 0) {
+                if (isQueuePaused) break;
+                let action = actionQueue[0]; 
+                
+                console.log(`[QUEUE] Starting Priority ${action.priority} -> ${action.type} for ${action.name}`);
+                let success = false;
+                
+                if (action.type === 'REBALANCE') success = await executeRebalance(action.index, true);
+                else if (action.type === 'COMPOUND') success = await executeCompound(action.index, true);
+                else if (action.type === 'HARVEST') success = await executeClaimOnly(action.index, true);
+
+                if (success) {
+                    actionQueue.shift(); 
+                } else {
+                    isQueuePaused = true;
+                    document.getElementById('failActionType').innerText = action.type;
+                    document.getElementById('failPoolName').innerText = action.name;
+                    document.getElementById('retryModal').classList.add('active');
+                    break; 
+                }
+            }
+        }
+
+        function retryQueueAction() {
+            document.getElementById('retryModal').classList.remove('active');
+            isQueuePaused = false;
+            processAutomations(); 
+        }
+
+        function skipQueueAction() {
+            document.getElementById('retryModal').classList.remove('active');
+            isQueuePaused = false;
+            actionQueue.shift(); 
+            processAutomations(); 
+        }
+async function closePosition(index) {
+        const pool = monitoredPools[index];
+        if (!userAddress) { alert("Connect wallet!"); return false; }
+        
+        pool.isLoading = true;
+        renderPools();
+
+        const nfpm = new ethers.Contract(NFPM_ADDRESS, NFPM_ABI, signer);
+        const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
+        const MAX_UINT128 = 340282366920938463463374607431768211455n;
+
+        try {
+            if (pool.isStaked && pool.gaugeAddr && pool.gaugeAddr !== ZERO_ADDR) {
+                console.log(`[1/3] Unstaking NFT #${pool.nftId}...`);
+                const gauge = new ethers.Contract(pool.gaugeAddr, GAUGE_ABI, signer);
+                await (await gauge.withdraw(pool.nftId)).wait();
+            }
+
+            console.log(`[2/3] Decreasing Liquidity...`);
+            const pos = await nfpm.positions(pool.nftId);
+            if (pos.liquidity > 0n) {
+                await (await nfpm.decreaseLiquidity({ 
+                    tokenId: pool.nftId, 
+                    liquidity: pos.liquidity, 
+                    amount0Min: 0, 
+                    amount1Min: 0, 
+                    deadline 
+                })).wait();
+            }
+
+            console.log(`[3/3] Collecting Tokens...`);
+            const tx = await nfpm.collect({ 
+                tokenId: pool.nftId, 
+                recipient: userAddress, 
+                amount0Max: MAX_UINT128, 
+                amount1Max: MAX_UINT128 
+            });
+            await tx.wait();
+
+            console.log("Position Closed!");
+            
+            if (typeof addHistoryLog === "function") {
+                addHistoryLog("CLOSE", `Closed ${pool.pairName} (NFT #${pool.nftId})`, 0, tx.hash);
+            }
+            
+            alert("Position successfully closed! Tokens and Pending AERO have been returned to your wallet.");
+            return true;
+
+        } catch (e) {
+            console.error("Close Error:", e);
+            alert("Failed to close position. Check console.");
+            pool.isLoading = false;
+            renderPools();
+            return false;
+        }
+    }
+        async function refreshAllPools() {
+            if(!userAddress || isQueuePaused) return; 
+            for(let i=0; i<monitoredPools.length; i++) await fetchPoolData(i);
+            renderPools();
+            processAutomations(); 
+        }
+
+        function toggleMonitor() {
+            const btn = document.getElementById('btnToggleMonitor');
+            const log = document.getElementById('monitorLog');
+            
+            if(monitorInterval) {
+                clearInterval(monitorInterval); monitorInterval = null;
+                btn.innerText = "MONITOR: OFF"; btn.classList.remove('active'); log.style.display = "none";
+            } else {
+                if(!userAddress) return alert("Connect wallet!");
+                monitorInterval = setInterval(refreshAllPools, 30000);
+                refreshAllPools();
+                btn.innerText = "MONITOR: ON"; btn.classList.add('active'); log.style.display = "block";
+            }
+        }
+
+        function toggleAutoRebalance() {
+            const btn = document.getElementById('btnToggleAuto');
+            isAutoRebalanceEnabled = !isAutoRebalanceEnabled;
+            
+            if(isAutoRebalanceEnabled) {
+                alert("WARNING: Auto-Rebalance is active. When a pool goes out of bounds, your wallet will automatically prompt you to sign the rebalance transactions.");
+                btn.innerText = "AUTO-REBALANCE: ON"; btn.classList.add('active');
+            } else {
+                btn.innerText = "AUTO-REBALANCE: OFF"; btn.classList.remove('active');
+            }
+        }
+
+      function renderPools() {
+    const cont = document.getElementById('poolListContainer');
+    cont.innerHTML = '';
+    
+    if(monitoredPools.length === 0) { 
+        cont.innerHTML = `<div style="text-align:center; padding: 20px; font-family:'Courier Prime'; border: 2px dashed #000;">NO POOLS ADDED</div>`; 
+        return; 
+    }
+
+    monitoredPools.forEach((pool, idx) => {
+        const card = document.createElement('div');
+      const isBad = pool.outOfBounds || pool.shiftTriggered;
+        card.className = `pool-card ${isBad ? 'out-of-bounds' : ''}`;
+
+        let statusHtml = pool.isLoading ? `<span class="status-badge">LOADING...</span>` : 
+            (pool.nftId === "0" ? `<span class="status-badge" style="background:var(--secondary-bg); color:var(--text-dim); border-color:var(--border-color);">NO ACTIVE NFT</span>` : 
+            (isBad ? `<span class="status-badge status-bad">${pool.shiftTriggered && !pool.outOfBounds ? 'SHIFT TRIGGERED' : 'OUT OF BOUNDS'}</span>` : `<span class="status-badge status-ok">IN RANGE</span>`));
+
+        card.innerHTML = `
+            <div class="pool-header">
+                <div class="pool-pair">
+                    ${pool.pairName} 
+                    <span style="font-size:11px; font-weight:normal; font-family:'Courier Prime'; color:var(--text-dim);">
+                        (Low: ${pool.lowMult} | High: ${pool.highMult} | Buf: ${pool.buffer}% | Shift: ${pool.shiftTrigger || 0}% | Size: ${pool.sizeUsd > 0 ? '$'+pool.sizeUsd : 'MAX'})
+                    </span>
+                </div>                
+                <div class="pool-actions">
+                    ${statusHtml}
+                    <button class="small-btn" onclick="editPoolSettings(${idx})" title="Edit Strategy" style="padding: 4px 8px; font-size: 14px;">⚙️</button>
+                    <button class="small-btn" onclick="fetchPoolData(${idx}).then(renderPools)">↻</button>
+                    <button class="small-btn" onclick="removePool(${idx})">X</button>
+                </div>
+            </div>
+            <div class="mini-grid" style="margin-bottom:0; gap: 10px;">
+                <div class="mini-box" style="padding:10px;">
+                    <div class="mini-label">Current Price</div>
+                    <div class="mini-val">${pool.humanPrice || '---'}</div>
+                    <div style="font-size:10px; font-family:'Courier Prime'; color:#888; margin-top:4px;">Tick: ${pool.currentTick}</div>
+                </div>
+           <div class="mini-box" style="padding:10px; display:flex; justify-content:space-between; align-items:center;">
+                    <div style="display:flex; flex-direction:column; justify-content:space-between; height:100%; flex: 1; padding-right: 10px; overflow: hidden;">
+                        <div>
+                            <div class="mini-label">Your NFT</div>
+                            <div class="mini-val" style="font-size: 15px; white-space: nowrap; word-break: normal;">${pool.nftId !== "0" ? '#' + pool.nftId : 'None'}</div>
+                        </div>
+                        ${(pool.nftId !== "0" && pool.gaugeAddr !== ZERO_ADDR) || pool.nftId === "0" ? `
+                        <div style="font-family:'Courier Prime'; font-size:9px; cursor:pointer; border:1px solid var(--border-color); padding:2px 4px; font-weight:bold; background:${pool.stakeNFT ? 'var(--text-main)' : 'var(--bg-body)'}; color:${pool.stakeNFT ? 'var(--bg-body)' : 'var(--text-main)'}; display:inline-block; width:fit-content; margin-top:5px; white-space: nowrap;" onclick="toggleStake(${idx})">
+                            STAKE: ${pool.stakeNFT ? 'ON (AERO)' : 'OFF (FEES)'}
+                        </div>` : ''}
+                    </div>
+                    
+                    <div style="display:flex; flex-direction:column; align-items:center; border-left: 2px dashed var(--border-color); padding-left: 10px; height:100%; justify-content:center; min-width: 65px;">
+                        <div class="mini-label" style="margin-bottom:2px; font-size:10px;">PRIORITY</div>
+                        <div onwheel="handlePriorityScroll(event, ${idx})" style="font-family:'Merriweather', serif; font-size:22px; font-weight:900; background:var(--secondary-bg); border:2px solid var(--border-color); width:45px; height:35px; display:flex; align-items:center; justify-content:center; cursor:ns-resize; user-select:none; box-shadow: inset 0px 4px 5px rgba(0,0,0,0.1);" id="priority-val-${idx}" title="Scroll mouse wheel up/down to set priority (1 is first)">
+                            ${pool.priority || (idx + 1)}
+                        </div>
+                        <button class="small-btn" style="padding:2px 4px; font-size:8px; margin-top:4px; width:100%;" onclick="randomizePriority(${idx})">RANDOM</button>
+                    </div>
+                </div>
+               <div class="mini-box" style="padding:10px; flex:2;">
+                    <div class="mini-label">Active Range</div>
+                    ${pool.nftId !== "0" ? `
+                        <div style="display:flex; justify-content:space-between; font-size:14px; margin-bottom:4px; font-family:'Merriweather'; font-weight:900;">
+<span style="color:var(--text-dim);">LOW:</span>
+                            <span>${pool.priceLower} <span style="font-size:10px; font-family:'Courier Prime'; color:${pool.pctLower < 0 ? 'red' : 'green'};">(${pool.pctLower > 0 ? '+'+pool.pctLower : pool.pctLower}%)</span></span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; font-size:14px; font-family:'Merriweather'; font-weight:900;">
+<span style="color:var(--text-dim);">HIGH:</span>
+                            <span>${pool.priceUpper} <span style="font-size:10px; font-family:'Courier Prime'; color:${pool.pctUpper < 0 ? 'red' : 'green'};">(${pool.pctUpper > 0 ? '+'+pool.pctUpper : pool.pctUpper}%)</span></span>
+                        </div>
+                        
+                        ${(() => {
+                            let pC = parseFloat(pool.humanPrice);
+                            let pL = parseFloat(pool.priceLower);
+                            let pH = parseFloat(pool.priceUpper);
+                            if(isNaN(pC) || isNaN(pL) || isNaN(pH)) return '';
+                            
+                            let span = pH - pL;
+                            let gMin = Math.min(pC * 0.95, pL - span * 0.3);
+                            let gMax = Math.max(pC * 1.05, pH + span * 0.3);
+                            let gSpan = gMax - gMin;
+                            
+                            let left = Math.max(0, ((pL - gMin) / gSpan) * 100);
+                            let width = Math.min(100 - left, ((pH - pL) / gSpan) * 100);
+                            let current = Math.max(0, Math.min(100, ((pC - gMin) / gSpan) * 100));
+                            
+                            return `
+                            <div style="margin-top:12px;">
+<div style="width:100%; height:14px; background:var(--secondary-bg); border:1px solid var(--border-color); position:relative; border-radius:2px; overflow:hidden;">
+                                    <div style="position:absolute; left:${left}%; width:${width}%; height:100%; background:rgba(0, 200, 0, 0.25); border-left:1px solid green; border-right:1px solid green;"></div>
+                                    <div style="position:absolute; left:${current}%; width:2px; height:100%; background:#000; z-index:2; box-shadow: 0 0 2px rgba(255,255,255,0.8);"></div>
+                                </div>
+                                <div style="display:flex; justify-content:space-between; font-size:9px; font-family:'Courier Prime'; margin-top:3px; color:#888; font-weight:bold;">
+                                    <span>GRAPH: POSITION VS LIVE PRICE</span>
+                                    <span style="color:black;">| Live Price</span>
+                                </div>
+                            </div>`;
+                        })()}
+                    ` : `<div class="mini-val" style="font-size:14px;">N/A</div>`}
+                </div>
+                <div style="display:flex; align-items:flex-end;">
+                    <button class="action-btn" style="margin-top:0; padding:10px; font-size:14px; height:100%; box-shadow:2px 2px 0px #000;" 
+                        onclick="executeRebalance(${idx})" 
+                        ${pool.isLoading || pool.isRebalancing ? 'disabled' : ''}>
+                        ${pool.isRebalancing ? 'WORKING...' : (pool.nftId === "0" ? 'MINT NEW' : 'REBALANCE')}
+                    </button>
+                </div>
+            </div>
+            
+           ${pool.nftId !== "0" ? `
+            <div class="mini-grid" style="margin-top:10px; margin-bottom:0; gap: 10px;">
+                <div class="mini-box" style="padding:10px; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div class="mini-label">Live Performance</div>
+                        <div class="mini-val" style="font-size:16px;">
+                            ${pool.outOfBounds ? '<span style="color:red; font-size:14px;">OUT OF RANGE (0% APR)</span>' : 
+                                (pool.stakeNFT ? `<span style="color:#000;">${pool.apr || 0}% APR</span> <span style="font-size:12px; font-weight:normal; font-family:'Courier Prime'; color:var(--text-dim);"> (~${(pool.dailyAero || 0).toFixed(2)} AERO/day)</span>` : 
+                                `<span style="color:#000;">${pool.feeApr || 0}% APR</span> <span style="font-size:12px; font-weight:normal; font-family:'Courier Prime';"> (Swap Fees)</span>`)
+                            }
+                        </div>
+                    </div>
+                  
+                  ${pool.stakeNFT ? `
+                <div style="text-align:right; border-left:2px solid var(--border-color); padding-left:15px; display:flex; flex-direction:column; justify-content:center; align-items:flex-end;">
+    <div style="display:flex; align-items:center; gap:5px; margin-bottom:8px;">
+        <div class="mini-label" style="margin:0;">Auto Modes (≥${pool.compoundThreshold || 5})</div>
+        
+        <div title="Auto-Harvest to Wallet" style="font-family:'Courier Prime'; font-size:9px; cursor:pointer; border:1px solid var(--border-color); padding:2px 4px; font-weight:bold; background:${pool.autoHarvest ? 'var(--text-main)' : 'var(--bg-body)'}; color:${pool.autoHarvest ? 'var(--bg-body)' : 'var(--text-main)'};" onclick="togglePoolAutoHarvest(${idx})">
+            HRVST: ${pool.autoHarvest ? 'ON' : 'OFF'}
+        </div>
+
+        <div title="Auto-Compound into Position" style="font-family:'Courier Prime'; font-size:9px; cursor:pointer; border:1px solid var(--border-color); padding:2px 4px; font-weight:bold; background:${pool.autoCompound ? 'var(--text-main)' : 'var(--bg-body)'}; color:${pool.autoCompound ? 'var(--bg-body)' : 'var(--text-main)'};" onclick="togglePoolAutoCompound(${idx})">
+            CMPD: ${pool.autoCompound ? 'ON' : 'OFF'}
+        </div>
+    </div>
+
+    <div class="mini-label" style="margin:0; margin-bottom:2px;">Pending Rewards</div>
+
+    <div class="mini-val" style="font-size:16px; color:var(--text-main); margin-bottom: 5px;">
+        ${pool.pendingAero || '0.00'} AERO
+    </div>
+
+    <div style="display: flex; gap: 5px; margin-top: 5px; width: 100%;">
+        <button class="small-btn" style="padding: 4px 8px; font-size:10px; flex: 1;" onclick="executeClaimOnly(${idx})">CLAIM AERO</button>
+        <button class="small-btn" style="padding: 4px 8px; font-size:10px; flex: 1; border-color: #00b800; color: #00b800;" onclick="executeCompound(${idx})">COMPOUND NOW</button>
+    </div>
+</div>
+                  ` : `
+                  <div style="text-align:right; border-left:2px solid #000; padding-left:15px; display:flex; flex-direction:column; justify-content:center; align-items:flex-end;">
+                        <div class="mini-label" style="margin:0; margin-bottom:4px;">Pending Fees <span style="color:green;">($${(pool.pendingFeesUsd || 0).toFixed(2)})</span></div>
+                        <div class="mini-val" style="font-size:12px; color:#555; margin-bottom: 5px; text-align:right;">
+                            ${pool.pending0Str} ${pool.pairName.split(" / ")[0]} <br> 
+                            ${pool.pending1Str} ${pool.pairName.split(" / ")[1]}
+                        </div>
+                        <button class="small-btn" style="padding: 4px 8px; font-size:10px; margin-top:5px;" onclick="executeRebalance(${idx})">COLLECT & REINVEST</button>
+                    </div>
+                  `}
+                </div>
+            </div>` : ''}
+        `;
+        
+        cont.appendChild(card);
+    });
+}
+
+async function executeRebalance(index, isAuto = false) {
+    const pool = monitoredPools[index];
+    if(!pool.t0Addr) return alert("Data not loaded!");
+    if(pool.isRebalancing) return;
+    
+    await checkLowGas(); 
+    
+    pool.isRebalancing = true;
+    renderPools();
+
+    const nfpm = new ethers.Contract(NFPM_ADDRESS, NFPM_ABI, signer);
+    const deadline = Math.floor(Date.now() / 1000) + 60 * 20;
+
+    try {
+        const t0 = new ethers.Contract(pool.t0Addr, ERC20_ABI, signer);
+        const t1 = new ethers.Contract(pool.t1Addr, ERC20_ABI, signer);
+        const [dec0, dec1] = await Promise.all([t0.decimals(), t1.decimals()]);
+        const d0 = Number(dec0);
+        const d1 = Number(dec1);
+
+        if(pool.nftId !== "0") {
+            console.log(`[1/4] Withdrawing NFT #${pool.nftId}...`);
+            
+            if (pool.isStaked && pool.gaugeAddr && pool.gaugeAddr !== ZERO_ADDR) {
+                console.log(`Unstaking from Gauge...`);
+                const gauge = new ethers.Contract(pool.gaugeAddr, GAUGE_ABI, signer);
+                await (await gauge.withdraw(pool.nftId)).wait();
+            }
+
+            const pos = await nfpm.positions(pool.nftId);
+            if(pos.liquidity > 0n) {
+                await (await nfpm.decreaseLiquidity({ 
+                    tokenId: pool.nftId, liquidity: pos.liquidity, 
+                    amount0Min: 0, amount1Min: 0, deadline 
+                })).wait();
+            }
+              const MAX_UINT128 = 340282366920938463463374607431768211455n; 
+            
+            await (await nfpm.collect({ 
+                tokenId: pool.nftId, recipient: userAddress, 
+                amount0Max: MAX_UINT128, amount1Max: MAX_UINT128 
+            })).wait();
+        }
+
+        console.log(`[2/4] Balancing Tokens...`);
+        let bal0 = await t0.balanceOf(userAddress);
+        let bal1 = await t1.balanceOf(userAddress);
+        let humanPrice = 0; 
+
+        const oneT0 = ethers.parseUnits("1", d0).toString();
+        const pReq = await fetch("https://api.odos.xyz/sor/quote/v2", {
+            method: "POST", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ chainId: BASE_CHAIN_ID, inputTokens:[{ tokenAddress: pool.t0Addr, amount: oneT0 }], outputTokens:[{ tokenAddress: pool.t1Addr, proportion: 1 }], userAddr: userAddress, slippageLimitPercent: 1.0, compact: true })
+        });
+
+        if(pReq.ok) {
+            const pData = await pReq.json();
+            humanPrice = parseFloat(ethers.formatUnits(pData.outAmounts[0], d1));
+            const v0 = parseFloat(ethers.formatUnits(bal0, d0)) * humanPrice; 
+            const v1 = parseFloat(ethers.formatUnits(bal1, d1)); 
+            
+            let targetTotalV = v0 + v1; 
+            
+            if (pool.sizeUsd > 0) {
+                const p1 = await getCachedPriceUSD(pool.t1Addr, d1);
+                if (p1 > 0) {
+                    const requestedV = pool.sizeUsd / p1; 
+                    if (requestedV < targetTotalV) {
+                        targetTotalV = requestedV; 
+                    } else {
+                        console.log("Wallet balance less than requested Size, using MAX.");
+                    }
+                }
+            }
+            
+            const vTarget = targetTotalV / 2;
+            let swapTok = null, swapAmtWei = "0";
+
+            if (v0 < vTarget * 0.98) {
+                const diffHuman = vTarget - v0; 
+                swapTok = t1; 
+                swapAmtWei = ethers.parseUnits(diffHuman.toFixed(d1), d1).toString();
+            } else if (v1 < vTarget * 0.98) {
+                const diffHumanT1 = vTarget - v1; 
+                const diffHumanT0 = diffHumanT1 / humanPrice; 
+                swapTok = t0; 
+                swapAmtWei = ethers.parseUnits(diffHumanT0.toFixed(d0), d0).toString();
+            }
+
+            if (swapTok && swapAmtWei !== "0" && swapAmtWei !== "0.000000") {
+                const outT = swapTok.target === pool.t0Addr ? pool.t1Addr : pool.t0Addr;
+                const qRes = await fetch("https://api.odos.xyz/sor/quote/v2", {
+                    method: "POST", headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ chainId: BASE_CHAIN_ID, inputTokens:[{ tokenAddress: swapTok.target, amount: swapAmtWei }], outputTokens:[{ tokenAddress: outT, proportion: 1 }], userAddr: userAddress, slippageLimitPercent: 1.0, compact: true })
+                });
+                
+                if(qRes.ok) {
+                    const qData = await qRes.json();
+                    const aRes = await fetch("https://api.odos.xyz/sor/assemble", {
+                        method: "POST", headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ userAddr: userAddress, pathId: qData.pathId, simulate: false })
+                    });
+                    
+                    if(aRes.ok) {
+                        const aData = await aRes.json();
+                        if(await swapTok.allowance(userAddress, aData.transaction.to) < BigInt(swapAmtWei)) {
+                            await (await swapTok.approve(aData.transaction.to, ethers.MaxUint256)).wait();
+                        }
+                        await (await signer.sendTransaction({ to: aData.transaction.to, data: aData.transaction.data, value: aData.transaction.value })).wait();
+                    }
+                }
+            }
+        }
+
+        console.log(`[3/4] Minting Position...`);
+        const fBal0 = await t0.balanceOf(userAddress);
+        const fBal1 = await t1.balanceOf(userAddress);
+
+        let desired0 = fBal0;
+        let desired1 = fBal1;
+        
+        if (pool.sizeUsd > 0 && humanPrice > 0) {
+            const p1 = await getCachedPriceUSD(pool.t1Addr, d1);
+            if (p1 > 0) {
+                const requestedV = pool.sizeUsd / p1; 
+                const targetT0Human = (requestedV / 2) / humanPrice;
+                const targetT1Human = (requestedV / 2);
+                
+                const d0Big = ethers.parseUnits(targetT0Human.toFixed(d0), d0);
+                const d1Big = ethers.parseUnits(targetT1Human.toFixed(d1), d1);
+                
+                desired0 = d0Big > fBal0 ? fBal0 : d0Big; 
+                desired1 = d1Big > fBal1 ? fBal1 : d1Big;
+            }
+        }
+
+        const poolContract = new ethers.Contract(pool.address, POOL_ABI, provider);
+        const[latestSlot, realSpacing] = await Promise.all([poolContract.slot0(), poolContract.tickSpacing()]);
+        
+        const spacing = Number(realSpacing);
+        const floorTick = Math.floor(Number(latestSlot.tick) / spacing) * spacing;
+
+        if(await t0.allowance(userAddress, NFPM_ADDRESS) < desired0) await (await t0.approve(NFPM_ADDRESS, ethers.MaxUint256)).wait();
+        if(await t1.allowance(userAddress, NFPM_ADDRESS) < desired1) await (await t1.approve(NFPM_ADDRESS, ethers.MaxUint256)).wait();
+
+        const lowTicks = Math.abs(Math.log(1 - (pool.lowMult / 100)) / Math.log(1.0001));
+        const highTicks = Math.abs(Math.log(1 + (pool.highMult / 100)) / Math.log(1.0001));
+
+        const safeLowOffset = Math.max(spacing, Math.round(lowTicks / spacing) * spacing); 
+        const safeHighOffset = Math.max(spacing, Math.round(highTicks / spacing) * spacing);
+
+        const txMint = await nfpm.mint({
+            token0: pool.t0Addr, token1: pool.t1Addr, tickSpacing: spacing,
+            tickLower: floorTick - safeLowOffset, 
+            tickUpper: floorTick + safeHighOffset,
+            amount0Desired: desired0, amount1Desired: desired1, amount0Min: 0, amount1Min: 0,
+            recipient: userAddress, deadline: deadline, sqrtPriceX96: 0
+        });
+        
+        const receipt = await txMint.wait();
+
+         let newTokenId = null;
+        for (const log of receipt.logs) {
+            if (log.address.toLowerCase() !== NFPM_ADDRESS.toLowerCase()) continue;
+            
+            try {
+                const parsed = nfpm.interface.parseLog(log);
+                if (parsed && parsed.name === "Transfer" && parsed.args.to.toLowerCase() === userAddress.toLowerCase()) {
+                    newTokenId = parsed.args.tokenId;
+                }
+            } catch(e) {} 
+        }
+
+        if (pool.stakeNFT && newTokenId && pool.gaugeAddr && pool.gaugeAddr !== ZERO_ADDR) {
+            console.log(`[4/4] Staking Token #${newTokenId} into Gauge...`);
+            const gauge = new ethers.Contract(pool.gaugeAddr, GAUGE_ABI, signer);
+            
+            console.log("Approving NFT to Gauge...");
+            await (await nfpm.approve(pool.gaugeAddr, newTokenId)).wait();
+            
+            console.log("Depositing...");
+            await (await gauge.deposit(newTokenId)).wait();
+        }
+
+        console.log("Rebalance & Staking Success!");
+		 pool.lastRebalanceTime = Date.now();
+        savePoolsToStorage();
+  const p0 = await getCachedPriceUSD(pool.t0Addr, d0);
+        const p1 = await getCachedPriceUSD(pool.t1Addr, d1);
+        const usdVal = (parseFloat(ethers.formatUnits(fBal0, d0)) * p0) + (parseFloat(ethers.formatUnits(fBal1, d1)) * p1);
+        addHistoryLog("REBALANCE", `Rebalanced ${pool.pairName} (NFT #${newTokenId || 'Unstaked'})`, usdVal, txMint.hash);
+  } catch(e) {
+        console.error("Rebalance Error:", e);
+        if (!isAuto) alert("REBALANCE FAILED: Check console for details.");
+        pool.isRebalancing = false;
+        renderPools();
+        return false;
+    }
+    return true;
+
+    pool.isRebalancing = false;
+    await fetchPoolData(index);
+    renderPools();
+}
+               
+
+        init();
+		
+    </script>
+</body>
+</html>
