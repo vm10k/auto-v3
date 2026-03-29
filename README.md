@@ -1,5 +1,5 @@
 
-# Auto V3 - Aerodrome Slipstream Liquidity Manager <img width="801" height="111" alt="image" src="https://github.com/user-attachments/assets/57048dfe-fae1-4d06-b80f-478ffcb054f6" />
+# Auto V3 - Aerodrome Slipstream Liquidity Manager <img width="801" height="111" alt="image" src="https://github.com/user-attachments/assets/ccb89ad1-33a4-446e-963b-80b03f11ace8" />
 
 
 ## Overview
